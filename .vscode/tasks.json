@@ -1,0 +1,45 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Compile All C Test Files and Debug", 
+            "command": "gcc",
+            "args": [
+                "-g",
+                "${workspaceFolder}/test.c", 
+                "${workspaceFolder}/globals.c", 
+                "${workspaceFolder}/tokenizer.c", 
+                "${workspaceFolder}/ast.c", 
+                "${workspaceFolder}/ast_debug.c", 
+                "-DDEBUG",
+                "-o",
+                "${workspaceFolder}/test"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+         {
+            "type": "shell",
+            "label": "Compile All C Files and Debug", 
+            "command": "gcc",
+            "args": [
+                "-g",
+                "${workspaceFolder}/main.c", 
+                "${workspaceFolder}/globals.c", 
+                "${workspaceFolder}/tokenizer.c", 
+                "${workspaceFolder}/ast.c", 
+                "${workspaceFolder}/executor.c", 
+                "-DDEBUG",
+                "-o",
+                "${workspaceFolder}/main"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
