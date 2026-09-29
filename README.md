@@ -24,7 +24,7 @@ ShadowShell is not a basic string-splitting wrapper. It implements a custom lexi
 Ensure you have `gcc` installed. Clone the repository and compile the source files directly:
 
 ```bash
-git clone [https://github.com/ISMAILSHADOW/ShadowShell.git](https://github.com/YOUR_USERNAME/ShadowShell.git)
+git clone https://github.com/ISMAILSHADOW/ShadowShell.git
 cd ShadowShell
 gcc main.c ast.c executor.c globals.c tokenizer.c -o ShadowShell
 ```
