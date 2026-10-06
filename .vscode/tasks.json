@@ -40,6 +40,28 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+         {
+            "type": "shell",
+            "label": "Compile All C Files For Profiling", 
+            "command": "gcc",
+            "args": [
+                "-g",
+                "-pg",
+                "-O0",
+                "${workspaceFolder}/main.c", 
+                "${workspaceFolder}/globals.c", 
+                "${workspaceFolder}/tokenizer.c", 
+                "${workspaceFolder}/ast.c", 
+                "${workspaceFolder}/executor.c", 
+                "-DDEBUG",
+                "-o",
+                "${workspaceFolder}/main"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }

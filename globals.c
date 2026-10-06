@@ -19,8 +19,9 @@ DEFINE_DYNAMIC_ARRAY(char *, ArgsArray)
 DEFINE_DYNAMIC_ARRAY(ASTNode *, NodeArray)
 DEFINE_DYNAMIC_ARRAY(Redirect, RedirectArray)
 DEFINE_DYNAMIC_ARRAY(LogicalNode, LogicalArray)
-DEFINE_DYNAMIC_ARRAY(Pipe, PipeArray);
+DEFINE_DYNAMIC_ARRAY(FDPair, PipeArray);
 DEFINE_DYNAMIC_ARRAY(pid_t, PidArray);
+DEFINE_DYNAMIC_ARRAY(FDPair, OpenFDArray)
 
 char *line;
 Scanner scanner;
@@ -28,6 +29,7 @@ Parser parser;
 PidArray *bg_jobs;
 size_t size;
 const char *prompt_color = "\x1b[36m";
+bool running_builtin, interactive;
 
 void set_prompt_color(int ret) {
     if (ret == COMMAND_EMPTY)

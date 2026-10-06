@@ -21,6 +21,7 @@ extern Parser parser;
 extern Scanner scanner;
 extern PidArray *bg_jobs;
 extern size_t size;
+extern bool running_builtin, interactive;
 
 extern const char *const COLOR_RED;
 extern const char *const COLOR_GREEN;
@@ -42,11 +43,10 @@ typedef enum {
 } IntParseStatus;
 
 typedef enum {
-    COMMAND_EMPTY = -2,
+    COMMAND_EMPTY = -3,
+    COMMAND_EXIT_SUCCESSFUL = -2,
     COMMAND_FAILED = -1,
     COMMAND_SUCCESSFUL = 0,
-    COMMAND_NOT_FOUND,
-    COMMAND_EXIT_SUCCESSFUL,
 } CommandResult;
 
 // Flags for command prefixes.

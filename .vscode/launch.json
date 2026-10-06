@@ -52,11 +52,11 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 },
-                                {
-                    "description": "Enable GDB to follow child processes on fork",
-                    "text": "-gdb-set follow-fork-mode child",
-                    "ignoreFailures": false
-                },
+                // {
+                //     "description": "Enable GDB to follow child processes on fork",
+                //     "text": "-gdb-set follow-fork-mode child",
+                //     "ignoreFailures": false
+                // },
                 // {
                 //     "description": "Keep parent process suspended but attached",
                 //     "text": "-gdb-set detach-on-fork off",
@@ -67,8 +67,37 @@
                 //     "text": "-gdb-set follow-exec-mode new",
                 //     "ignoreFailures": false
                 // }
+                {
+                    "description": "Redirect stdin inside GDB from script file",
+                    "text": "-gdb-set args < massive_test.sh", // 👈 Tells GDB to handle the file pipeline directly
+                    "ignoreFailures": false
+                },
+            ]
+        },
+        {
+            "name": "(gdb) Profile Project",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/main",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "Compile All C Files For Profiling", 
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                },
             ]
         }
-
     ]
 }

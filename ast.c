@@ -6,7 +6,7 @@
 
 static ASTNode *command_list();
 
-static bool check(TokenType type) {
+static inline bool check(TokenType type) {
     return parser.current.type == type;
 }
 
@@ -16,7 +16,7 @@ static void parse_error(const char *msg, const char *pos) {
     snprintf(parser.error_msg, sizeof(parser.error_msg), "%s", msg);
 }
 
-static void error_at_current(const char *msg) {
+static inline void error_at_current(const char *msg) {
     parse_error(msg, parser.current.start);
 }
 
@@ -37,16 +37,16 @@ static void init_parser() {
     advance();
 }
 
-static Token peek_token() {
+static inline Token peek_token() {
     return parser.current;
 }
 
-static TokenType peek_type(){
+static inline TokenType peek_type(){
     return parser.current.type;
 }
 
 
-static bool is_word(TokenType token) {
+static inline bool is_word(TokenType token) {
     return token == TOKEN_IDENTIFIER || token == TOKEN_STRING;
 }
 

@@ -23,15 +23,15 @@ static Token make_error(const char *message) {
     return token;
 }
 
-static bool is_at_end() {
+static inline bool is_at_end() {
     return *scanner.current == '\0';
 }
 
-static char peek() {
+static inline char peek() {
     return *scanner.current;
 }
 
-static char advance() {
+static inline char advance() {
     return *scanner.current++;
 }
 

@@ -3,10 +3,11 @@
 
 typedef struct {
     int fd[2];
-} Pipe;
+} FDPair;
 
-DECLARE_DYNAMIC_ARRAY(Pipe, PipeArray);
+DECLARE_DYNAMIC_ARRAY(FDPair, PipeArray);
 DECLARE_DYNAMIC_ARRAY(pid_t, PidArray);
+DECLARE_DYNAMIC_ARRAY(FDPair, OpenFDArray)
 int execute_command();
 
 #endif

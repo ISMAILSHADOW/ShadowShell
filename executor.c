@@ -10,10 +10,33 @@
 #include <sys/stat.h>
 #include <signal.h>
 
+OpenFDArray *process_fds;
 
 static int execute_ast(ASTNode *node);
 
 static void init_executor() {
+    process_fds = OpenFDArray_create(8);
+    running_builtin = false;
+}
+
+static void clean_executor() {
+    OpenFDArray_destroy(process_fds);
+}
+
+static void backup_fd(int original) {
+    int backup = dup(original);
+    FDPair p = {.fd = {original, backup}};
+    OpenFDArray_push(process_fds, p);
+}
+
+static void restore_fds() {
+    for (ssize_t i = process_fds->size - 1;i >= 0;i--) {
+        int original = process_fds->data[i].fd[0];
+        int backup = process_fds->data[i].fd[1];
+        dup2(backup, original);
+        close(backup);
+    }
+    process_fds->size = 0;
 }
 
 static bool success(int ret) {
@@ -35,7 +58,7 @@ static int run_pipeline(ASTNode *node) {
     PipeArray *pipes = PipeArray_create(pline_size - 1);
     
     for (size_t i = 1;i < pline_size;i++) {
-        Pipe p;
+        FDPair p;
         if (pipe(p.fd) == -1) {
             fprintf(stderr, "ShadowShell: pipe: %s\n", strerror(errno));
             close_pipe_array(pipes);
@@ -78,6 +101,85 @@ static int run_pipeline(ASTNode *node) {
     return ret;
 }
 
+static bool redirect_file(char *path, int flags, int fd) {
+    int file = open(path, flags, 0666);
+    if (file == -1) {
+        fprintf(stderr, "ShadowShell: %s: %s\n", path, strerror(errno));
+        return false;
+    }
+    if (running_builtin) backup_fd(fd);
+    if (dup2(file, fd) == -1) {
+        fprintf(stderr, "ShadowShell: %s\n", strerror(errno));
+        close(file);
+        return false;
+    }
+    close(file);
+    return true;
+}
+
+static bool redirect_dup(const char *src, int fd) {
+    if (running_builtin) backup_fd(fd);
+
+    if (strcmp(src, "-") == 0) { 
+        close(fd); 
+        return true;
+    }
+    int from;
+    if (!parse_int_const(src, strlen(src), &from) || dup2(from, fd) == -1) {
+        fprintf(stderr, "ShadowShell: %s\n", strerror(errno));
+        return false;
+    }
+    return true;
+}
+
+static bool handle_redirects(RedirectArray *reds) {
+    for (size_t i = 0;i < reds->size;i++) {
+        int fd1 = reds->data[i].fd;
+        char *target = reds->data[i].target;
+        bool ok;
+        switch(reds->data[i].op) {
+            case TOKEN_LESS:
+                ok = redirect_file(target,  O_RDONLY, (fd1 == -1) ? STDIN_FILENO : fd1);
+                break;
+            case TOKEN_GREATER:
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC, (fd1 == -1) ? STDOUT_FILENO : fd1);
+                break;
+            case TOKEN_GREATER_GREATER:
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND, (fd1 == -1) ? STDOUT_FILENO : fd1);
+                break;
+            case TOKEN_LESS_AND:
+                ok = redirect_dup(target, (fd1 == -1) ? STDIN_FILENO : fd1);
+                break;
+            case TOKEN_GREATER_AND:
+                ok = redirect_dup(target, (fd1 == -1) ? STDOUT_FILENO : fd1);
+                break;
+            case TOKEN_AND_GREATER: // Redirect both stdout and stderr (Overwrite)
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC, (fd1 == -1) ? STDOUT_FILENO : fd1);
+                if (ok) {
+                    if (running_builtin) backup_fd(STDERR_FILENO);
+                    dup2(STDOUT_FILENO, STDERR_FILENO);
+                }
+                break;
+            case TOKEN_AND_GREATER_GREATER: // Redirect both stdout and stderr (Append)
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND, (fd1 == -1) ? STDOUT_FILENO : fd1);
+                if (ok) {
+                    if (running_builtin) backup_fd(STDERR_FILENO);
+                    dup2(STDOUT_FILENO, STDERR_FILENO);
+                }
+                break;
+            case TOKEN_LESS_GREATER:
+                ok = redirect_file(target, O_CREAT | O_RDWR , (fd1 == -1) ? STDIN_FILENO : fd1);
+                break;
+            default:
+                ok = false;
+        }
+
+        if (!ok) return false;
+    }
+    return true;
+} 
+
+
 static int cd_builtin(ArgsArray *args) {
     if (args->size > 2) {
         fprintf(stderr, "ShadowShell: cd: too many arguments\n");
@@ -114,90 +216,30 @@ static int run_builtin(ASTNode *node) {
     ArgsArray *args = node->cmd.args;
     const char *cmd = args->data[0];
 
+    if (node->cmd.redirect->size != 0 && !handle_redirects(node->cmd.redirect)) {
+        fprintf(stderr, "ShadowShell: %s: redirection failed\n", cmd);
+        return COMMAND_FAILED;
+    }
+
     if (strcmp(cmd, "cd") == 0) return cd_builtin(args);
     if (strcmp(cmd, "exit") == 0) return exit_builtin();
 
     return COMMAND_FAILED;
 }
 
-static bool redirect_file(char *path, int flags, int fd) {
-    int file = open(path, flags, 0666);
-    if (file == -1) {
-        fprintf(stderr, "ShadowShell: %s: %s\n", path, strerror(errno));
-        return false;
-    }
-    if (dup2(file, fd) == -1) {
-        fprintf(stderr, "ShadowShell: %s\n", strerror(errno));
-        close(file);
-        return false;
-    }
-    close(file);
-    return true;
-}
-
-static bool redirect_dup(const char *src, int fd) {
-    if (strcmp(src, "-") == 0) { 
-        close(fd); 
-        return true;
-    }
-    int from;
-    if (!parse_int_const(src, strlen(src), &from) || dup2(from, fd) == -1) {
-        fprintf(stderr, "ShadowShell: %s\n", strerror(errno));
-        return false;
-    }
-    return true;
-}
-
-static bool handle_redirects(RedirectArray *reds) {
-    for (size_t i = 0;i < reds->size;i++) {
-        int fd1 = reds->data[i].fd;
-        char *target = reds->data[i].target;
-        bool ok;
-        switch(reds->data[i].op) {
-            case TOKEN_LESS:
-                ok = redirect_file(target,  O_RDONLY, (fd1 == -1) ? STDIN_FILENO : fd1);
-                break;
-            case TOKEN_GREATER:
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC, (fd1 == -1) ? STDOUT_FILENO : fd1);
-                break;
-            case TOKEN_GREATER_GREATER:
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND, (fd1 == -1) ? STDOUT_FILENO : fd1);
-                break;
-            case TOKEN_LESS_AND:
-                ok = redirect_dup(target, (fd1 == -1) ? STDIN_FILENO : fd1);
-                break;
-            case TOKEN_GREATER_AND:
-                ok = redirect_dup(target, (fd1 == -1) ? STDOUT_FILENO : fd1);
-                break;
-            case TOKEN_AND_GREATER: // Redirect both stdout and stderr (Overwrite)
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC, (fd1 == -1) ? STDOUT_FILENO : fd1) &&
-                 dup2(STDOUT_FILENO, STDERR_FILENO);
-                break;
-            case TOKEN_AND_GREATER_GREATER: // Redirect both stdout and stderr (Append)
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND, (fd1 == -1) ? STDOUT_FILENO : fd1) &&
-                 dup2(STDOUT_FILENO, STDERR_FILENO);
-                break;
-            case TOKEN_LESS_GREATER:
-                ok = redirect_file(target, O_CREAT | O_RDWR , (fd1 == -1) ? STDIN_FILENO : fd1);
-                break;
-            default:
-                ok = false;
-        }
-
-        if (!ok) return false;
-    }
-    return true;
-} 
-
 static int run_subprocess(ASTNode *node, bool background) {
-    if (is_builtin(node) && !background) return run_builtin(node);
-
+    if (is_builtin(node) && !background)  {
+        running_builtin = true;
+        int ret = run_builtin(node);
+        restore_fds(); running_builtin = false;
+        return ret;
+    }
     int ret = -1;
     pid_t pid = fork();
     if (pid == 0) {
         if (node->type == NODE_COMMAND) {
             if (node->cmd.redirect->size != 0)
-                if (!handle_redirects(node->cmd.redirect))
+                if (!handle_redirects(node->cmd.redirect)) 
                     exit(1);
 
             ret = execvp(node->cmd.args->data[0], node->cmd.args->data);
@@ -236,9 +278,9 @@ static int run_subprocess(ASTNode *node, bool background) {
 }
 
 static int execute_ast(ASTNode *node) {
-    int ret = -1;
+    int ret = COMMAND_FAILED;
 
-    if (node == NULL) return -1;
+    if (node == NULL) return ret;
     switch (node->type) {
         case NODE_COMMAND_LIST:
             for (size_t i = 0;i < node->list.array->size;i++) 
@@ -272,8 +314,11 @@ static int execute_ast(ASTNode *node) {
 }
 
 int execute_command() {
+    init_executor();
     ASTNode *root = run_parser();
+    if (root == NULL) return COMMAND_EMPTY;
     int ret = execute_ast(root);
     free_ast(root);
+    clean_executor();
     return ret;
 }
