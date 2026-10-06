@@ -12,8 +12,6 @@ static const char *redirect_str(TokenType t) {
         case TOKEN_GREATER_AND:         return ">&";
         case TOKEN_AND_GREATER:         return "&>";
         case TOKEN_AND_GREATER_GREATER: return "&>>";
-        case TOKEN_LESS_LESS_LESS:      return "<<<";
-        case TOKEN_LESS_LESS_MINUS:     return "<<-";
         default:                        return "?";
     }
 }

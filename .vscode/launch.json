@@ -8,7 +8,7 @@
             "name": "(gdb) Debug test.c",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/main",
+            "program": "${workspaceFolder}/ShadowShell",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

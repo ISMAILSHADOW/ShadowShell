@@ -27,6 +27,7 @@ static void initialize() {
     bg_jobs = PidArray_create(8);
     line = NULL;
     size = 0;
+    interactive = isatty(STDIN_FILENO);
 }
 
 void loop_start() {
@@ -60,7 +61,8 @@ int main(int argc, char **argv) {
     while (1) {
         // loop_start();
 
-        printf("%s$ %s", prompt_color, COLOR_RESET);
+        if (interactive)
+            printf("%s$ %s", prompt_color, COLOR_RESET);
 
         ssize_t bytes_read = getline(&line, &size, stdin);
         if (bytes_read == -1) 

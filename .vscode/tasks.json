@@ -14,7 +14,7 @@
                 "${workspaceFolder}/ast_debug.c", 
                 "-DDEBUG",
                 "-o",
-                "${workspaceFolder}/test"
+                "${workspaceFolder}/ShadowShell"
             ],
             "group": {
                 "kind": "build",
@@ -34,7 +34,7 @@
                 "${workspaceFolder}/executor.c", 
                 "-DDEBUG",
                 "-o",
-                "${workspaceFolder}/main"
+                "${workspaceFolder}/ShadowShell"
             ],
             "group": {
                 "kind": "build",
@@ -56,7 +56,7 @@
                 "${workspaceFolder}/executor.c", 
                 "-DDEBUG",
                 "-o",
-                "${workspaceFolder}/main"
+                "${workspaceFolder}/ShadowShell"
             ],
             "group": {
                 "kind": "build",

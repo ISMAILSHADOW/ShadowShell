@@ -78,7 +78,7 @@ static int run_pipeline(ASTNode *node) {
             close_pipe_array(pipes);
 
             int ret = execute_ast(node->list.array->data[i]);
-            exit(ret);
+            _exit(ret);
         } else if (pid == -1) {
             for (size_t j = 0; j < pids->size; j++)
                 kill(pids->data[j], SIGKILL);
@@ -240,7 +240,7 @@ static int run_subprocess(ASTNode *node, bool background) {
         if (node->type == NODE_COMMAND) {
             if (node->cmd.redirect->size != 0)
                 if (!handle_redirects(node->cmd.redirect)) 
-                    exit(1);
+                    _exit(1);
 
             ret = execvp(node->cmd.args->data[0], node->cmd.args->data);
             fprintf(stderr, "ShadowShell: %s: %s\n", node->cmd.args->data[0], strerror(errno));
@@ -248,7 +248,7 @@ static int run_subprocess(ASTNode *node, bool background) {
         else {
             ret = execute_ast(node->unary.child);
         } 
-        exit(ret);
+        _exit(ret);
     }
     if (pid == -1) {
         fprintf(stderr, "ShadowShell: fork: %s\n", strerror(errno));
@@ -309,7 +309,7 @@ static int execute_ast(ASTNode *node) {
             return ret;
         default: 
             fprintf(stderr, "Maybe you added a new command without updating the executor?");
-            exit(1);
+            _exit(1);
     }
 }
 
