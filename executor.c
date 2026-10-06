@@ -43,63 +43,6 @@ static bool success(int ret) {
     return ret == 0;
 }
 
-static void close_pipe_array(PipeArray *pipes) {
-    for (size_t i = 0;i < pipes->size;i++) {
-        close(pipes->data[i].fd[0]);
-        close(pipes->data[i].fd[1]);
-    }
-    PipeArray_destroy(pipes);
-}
-
-
-static int run_pipeline(ASTNode *node) {
-    size_t pline_size = node->list.array->size;
-    PidArray *pids = PidArray_create(pline_size);
-    PipeArray *pipes = PipeArray_create(pline_size - 1);
-    
-    for (size_t i = 1;i < pline_size;i++) {
-        FDPair p;
-        if (pipe(p.fd) == -1) {
-            fprintf(stderr, "ShadowShell: pipe: %s\n", strerror(errno));
-            close_pipe_array(pipes);
-            PidArray_destroy(pids);
-            return -1;
-        }
-        PipeArray_push(pipes, p);
-    }
-
-    for (size_t i = 0;i < pline_size;i++) {
-        pid_t pid = fork();
-        if (pid == 0) {
-            if (i > 0)  // We can read from i - 1
-                dup2(pipes->data[i-1].fd[0], STDIN_FILENO);
-            if (i < (pline_size - 1)) // We can write to i
-                dup2(pipes->data[i].fd[1], STDOUT_FILENO);
-            close_pipe_array(pipes);
-
-            int ret = execute_ast(node->list.array->data[i]);
-            _exit(ret);
-        } else if (pid == -1) {
-            for (size_t j = 0; j < pids->size; j++)
-                kill(pids->data[j], SIGKILL);
-            close_pipe_array(pipes);
-            PidArray_destroy(pids);
-            return -1;
-        }
-        PidArray_push(pids, pid);
-    }
-    
-    close_pipe_array(pipes);
-    
-    int status, ret = -1;
-    for (size_t i = 0;i < pids->size;i++) {
-        if (waitpid(pids->data[i], &status, 0) == pids->data[i]) {
-            if (WIFEXITED(status)) ret = WEXITSTATUS(status);
-            else ret = -1;
-        } else ret = -1;
-    }
-    return ret;
-}
 
 static bool redirect_file(char *path, int flags, int fd) {
     int file = open(path, flags, 0666);
@@ -209,7 +152,7 @@ static int exit_builtin() {
 static bool is_builtin(ASTNode *node) {
     if (node->type != NODE_COMMAND || node->cmd.args->size == 0) return false;
     const char *cmd = node->cmd.args->data[0];
-    return (strcmp(cmd, "cd") == 0 || strcmp(cmd, "exit") == 0);
+    return (strcmp(cmd, "cd") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "true") == 0 || strcmp(cmd, "false") == 0);
 }
 
 static int run_builtin(ASTNode *node) {
@@ -223,24 +166,28 @@ static int run_builtin(ASTNode *node) {
 
     if (strcmp(cmd, "cd") == 0) return cd_builtin(args);
     if (strcmp(cmd, "exit") == 0) return exit_builtin();
+    if (strcmp(cmd, "true") == 0) return 0;
+    if (strcmp(cmd, "false") == 0) return 1;
 
     return COMMAND_FAILED;
 }
 
-static int run_subprocess(ASTNode *node, bool background) {
+static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
     if (is_builtin(node) && !background)  {
         running_builtin = true;
         int ret = run_builtin(node);
         restore_fds(); running_builtin = false;
         return ret;
     }
-    int ret = -1;
-    pid_t pid = fork();
-    if (pid == 0) {
+    int ret = -1; pid_t pid = -1;
+    if (!already_forked) pid = fork();
+    if (pid == 0 || already_forked) {
         if (node->type == NODE_COMMAND) {
             if (node->cmd.redirect->size != 0)
                 if (!handle_redirects(node->cmd.redirect)) 
                     _exit(1);
+
+            if (node->cmd.args->size == 0) _exit(0); // For redirect only commands
 
             ret = execvp(node->cmd.args->data[0], node->cmd.args->data);
             fprintf(stderr, "ShadowShell: %s: %s\n", node->cmd.args->data[0], strerror(errno));
@@ -277,6 +224,69 @@ static int run_subprocess(ASTNode *node, bool background) {
     return ret;
 }
 
+
+
+static void close_pipe_array(PipeArray *pipes) {
+    for (size_t i = 0;i < pipes->size;i++) {
+        close(pipes->data[i].fd[0]);
+        close(pipes->data[i].fd[1]);
+    }
+    PipeArray_destroy(pipes);
+}
+
+static int run_pipeline(ASTNode *node) {
+    size_t pline_size = node->list.array->size;
+    PidArray *pids = PidArray_create(pline_size);
+    PipeArray *pipes = PipeArray_create(pline_size - 1);
+    
+    for (size_t i = 1;i < pline_size;i++) {
+        FDPair p;
+        if (pipe(p.fd) == -1) {
+            fprintf(stderr, "ShadowShell: pipe: %s\n", strerror(errno));
+            close_pipe_array(pipes);
+            PidArray_destroy(pids);
+            return -1;
+        }
+        PipeArray_push(pipes, p);
+    }
+
+    for (size_t i = 0;i < pline_size;i++) {
+        ASTNode *cur = node->list.array->data[i];
+        NodeType type = cur->type;
+
+        pid_t pid = fork();
+        if (pid == 0) {
+            if (i > 0)  // We can read from i - 1
+                dup2(pipes->data[i-1].fd[0], STDIN_FILENO);
+            if (i < (pline_size - 1)) // We can write to i
+                dup2(pipes->data[i].fd[1], STDOUT_FILENO);
+            close_pipe_array(pipes);
+
+            if (type == NODE_COMMAND || type == NODE_SUBSHELL) // We avoid forking twice in row a pipeline
+                _exit(run_subprocess(cur, false, true));
+            _exit(execute_ast(cur));
+        } else if (pid == -1) {
+            for (size_t j = 0; j < pids->size; j++)
+                kill(pids->data[j], SIGKILL);
+            close_pipe_array(pipes);
+            PidArray_destroy(pids);
+            return -1;
+        }
+        PidArray_push(pids, pid);
+    }
+    
+    close_pipe_array(pipes);
+    
+    int status, ret = -1;
+    for (size_t i = 0;i < pids->size;i++) {
+        if (waitpid(pids->data[i], &status, 0) == pids->data[i]) {
+            if (WIFEXITED(status)) ret = WEXITSTATUS(status);
+            else ret = -1;
+        } else ret = -1;
+    }
+    return ret;
+}
+
 static int execute_ast(ASTNode *node) {
     int ret = COMMAND_FAILED;
 
@@ -301,11 +311,11 @@ static int execute_ast(ASTNode *node) {
             ret = run_pipeline(node);
             return ret;
         case NODE_BACKGROUND:
-            ret = run_subprocess(node, true);
+            ret = run_subprocess(node, true, false);
             return ret;
         case NODE_SUBSHELL:
         case NODE_COMMAND:
-            ret = run_subprocess(node, false);
+            ret = run_subprocess(node, false, false);
             return ret;
         default: 
             fprintf(stderr, "Maybe you added a new command without updating the executor?");
