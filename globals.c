@@ -1,4 +1,5 @@
-#include "DynamicArray.h"
+#include "DataStructures/Arenas/DynamicArray.h"
+#include "DataStructures/Arenas/Arena.h"
 #include "globals.h"
 #include "tokenizer.h"
 #include "ast.h"
@@ -6,6 +7,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 #include <sys/types.h>
 
 
@@ -27,6 +29,7 @@ char *line;
 Scanner scanner;
 Parser parser;
 PidArray *bg_jobs;
+ArenaAllocator bgjobs_arena, command_arena;
 size_t size;
 const char *prompt_color = "\x1b[36m";
 bool running_builtin, interactive;

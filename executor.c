@@ -3,6 +3,8 @@
 #include "executor.h"
 #include <unistd.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <string.h>
@@ -15,18 +17,15 @@ OpenFDArray *process_fds;
 static int execute_ast(ASTNode *node);
 
 static void init_executor() {
-    process_fds = OpenFDArray_create(8);
+    process_fds = OpenFDArray_create(&command_arena, 8);
     running_builtin = false;
 }
 
-static void clean_executor() {
-    OpenFDArray_destroy(process_fds);
-}
 
 static void backup_fd(int original) {
     int backup = dup(original);
     FDPair p = {.fd = {original, backup}};
-    OpenFDArray_push(process_fds, p);
+    OpenFDArray_push(&command_arena, process_fds, p);
 }
 
 static void restore_fds() {
@@ -203,8 +202,8 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
     }
 
     if (background) {
-        PidArray_push(bg_jobs, pid);
-        printf(YELLOW "[%d] %d" RESET "\n" , bg_jobs->size - 1, pid);
+        PidArray_push(&bgjobs_arena, bg_jobs, pid);
+        printf(YELLOW "[%zu] %d" RESET "\n" , bg_jobs->size - 1, pid);
         return 0;
     }
 
@@ -231,23 +230,21 @@ static void close_pipe_array(PipeArray *pipes) {
         close(pipes->data[i].fd[0]);
         close(pipes->data[i].fd[1]);
     }
-    PipeArray_destroy(pipes);
 }
 
 static int run_pipeline(ASTNode *node) {
     size_t pline_size = node->list.array->size;
-    PidArray *pids = PidArray_create(pline_size);
-    PipeArray *pipes = PipeArray_create(pline_size - 1);
+    PidArray *pids = PidArray_create(&command_arena, pline_size);
+    PipeArray *pipes = PipeArray_create(&command_arena, pline_size - 1);
     
     for (size_t i = 1;i < pline_size;i++) {
         FDPair p;
         if (pipe(p.fd) == -1) {
             fprintf(stderr, "ShadowShell: pipe: %s\n", strerror(errno));
             close_pipe_array(pipes);
-            PidArray_destroy(pids);
             return -1;
         }
-        PipeArray_push(pipes, p);
+        PipeArray_push(&command_arena, pipes, p);
     }
 
     for (size_t i = 0;i < pline_size;i++) {
@@ -269,10 +266,9 @@ static int run_pipeline(ASTNode *node) {
             for (size_t j = 0; j < pids->size; j++)
                 kill(pids->data[j], SIGKILL);
             close_pipe_array(pipes);
-            PidArray_destroy(pids);
             return -1;
         }
-        PidArray_push(pids, pid);
+        PidArray_push(&command_arena, pids, pid);
     }
     
     close_pipe_array(pipes);
@@ -328,7 +324,5 @@ int execute_command() {
     ASTNode *root = run_parser();
     if (root == NULL) return COMMAND_EMPTY;
     int ret = execute_ast(root);
-    free_ast(root);
-    clean_executor();
     return ret;
 }

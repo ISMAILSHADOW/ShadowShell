@@ -1,8 +1,9 @@
-#include "ast.h"
-#include "DynamicArray.h"
+#include "DataStructures/Arenas/DynamicArray.h"
 #include "tokenizer.h"
 #include "globals.h"
+#include "ast.h"
 #include <string.h>
+#include <stdio.h>
 
 static ASTNode *command_list();
 
@@ -52,8 +53,8 @@ static inline bool is_word(TokenType token) {
 
 static char *word_text(Token token) {
     if (token.type == TOKEN_STRING)
-        return strndup(token.start + 1, token.length - 2);   // drop both quotes
-    return strndup(token.start, token.length);
+        return arena_strndup(&command_arena, token.start + 1, token.length - 2);   // drop both quotes
+    return arena_strndup(&command_arena, token.start, token.length);
 }
 
 static bool is_redirect_op(TokenType token) {
@@ -112,25 +113,22 @@ static bool parse_redirect(Redirect *red) {
 }
 
 static ASTNode *simple_command() {
-    RedirectArray *r = RedirectArray_create(4);
-    ArgsArray *a = ArgsArray_create(4);
+    RedirectArray *r = RedirectArray_create(&command_arena, 4);
+    ArgsArray *a = ArgsArray_create(&command_arena, 4);
 
-    ASTNode *node = malloc(sizeof(ASTNode));
+    ASTNode *node = arena_alloc(&command_arena,  sizeof(ASTNode));
     node->type = NODE_COMMAND;
     node->cmd.args = a;
     node->cmd.redirect = r;
 
     while (1) {
         if (is_word(peek_type())) {
-            ArgsArray_push(a, word_text(peek_token()));
+            ArgsArray_push(&command_arena, a, word_text(peek_token()));
             advance();
         } else if (is_redirect_op(peek_type()) || check(TOKEN_IO_NUMBER)) {
             Redirect red;
-            if (!parse_redirect(&red)) {
-                free_ast(node);
-                return NULL;
-            }
-            RedirectArray_push(r, red);            
+            if (!parse_redirect(&red)) return NULL;
+            RedirectArray_push(&command_arena, r, red);            
         } else { 
            break;
         }
@@ -138,10 +136,8 @@ static ASTNode *simple_command() {
 
     if (a->size == 0 && r->size == 0) {
         error_at_current("expected a command");
-        free_ast(node);
         return NULL;
     }
-
 
     return node;
 }
@@ -153,12 +149,11 @@ static ASTNode *command() {
         ASTNode *node = command_list();
         if (!node || !check(TOKEN_RIGHT_PAREN)) {
             error_at_current("expected ')'");
-            free_ast(node);
             return NULL;
         }
 
         advance();
-        ASTNode *wrapper = malloc(sizeof(ASTNode));
+        ASTNode *wrapper = arena_alloc(&command_arena,  sizeof(ASTNode));
         wrapper->type = NODE_SUBSHELL;
         wrapper->unary.child = node;
         return wrapper;
@@ -171,20 +166,19 @@ static ASTNode *pipeline() {
     ASTNode *cmd = command();
     if (!check(TOKEN_OR) || !cmd) return cmd;
 
-    ASTNode *node = malloc(sizeof(ASTNode));
+    ASTNode *node = arena_alloc(&command_arena,  sizeof(ASTNode));
     node->type = NODE_PIPELINE;
-    node->list.array = NodeArray_create(4);
-    NodeArray_push(node->list.array, cmd);
+    node->list.array = NodeArray_create(&command_arena, 4);
+    NodeArray_push(&command_arena, node->list.array, cmd);
     while (check(TOKEN_OR)) {
         advance();
         cmd = command();
 
         if (!cmd) {
             error_at_current("pipe without a second operand");
-            free_ast(node);
             return cmd;
         }
-        NodeArray_push(node->list.array, cmd);
+        NodeArray_push(&command_arena, node->list.array, cmd);
     }
 
     return node;
@@ -200,7 +194,7 @@ static ASTNode *negation() {
     ASTNode *p = pipeline();
     if (!negate || !p) return p;
     
-    ASTNode *node = malloc(sizeof(ASTNode));
+    ASTNode *node = arena_alloc(&command_arena, sizeof(ASTNode));
     node->type = NODE_NEGATION;
     node->unary.child = p;
     return node;
@@ -208,20 +202,18 @@ static ASTNode *negation() {
 
 
 static ASTNode *logical(void) {
-    ASTNode *list = malloc(sizeof(ASTNode));
+    ASTNode *list = arena_alloc(&command_arena, sizeof(ASTNode));
     list->type = NODE_LOGICAL_LIST;
-    list->logical.items = LogicalArray_create(4);
+    list->logical.items = LogicalArray_create(&command_arena, 4);
 
     Operator op = OP_AND_AND;          
     ASTNode *node = negation();
 
-    if (!node) {
-        free_ast(list);
-        return node;
-    }
+    if (!node) return node;
+    
 
     while(1) {
-        LogicalArray_push(list->logical.items, (LogicalNode){ .op = op, .node = node });
+        LogicalArray_push(&command_arena, list->logical.items, (LogicalNode){ .op = op, .node = node });
 
         if (check(TOKEN_AND_AND))      op = OP_AND_AND;
         else if (check(TOKEN_OR_OR))   op = OP_OR_OR;
@@ -230,37 +222,28 @@ static ASTNode *logical(void) {
         advance();
         node = negation();
         
-        if (!node) {
-            free_ast(list);
-            return node;
-        }
-    }
+        if (!node) return node;
 
-    // Only one item means there was no operator, so return the one node
-    if (list->logical.items->size == 1) {
-        LogicalArray_destroy(list->logical.items);
-        free(list);
-        return node;
     }
+    // Only one item means there was no operator, so return the one node
+    if (list->logical.items->size == 1) return node;
+    
     return list;
 }
 
 static ASTNode *command_list() {
-    ASTNode *list = malloc(sizeof(ASTNode));
+    ASTNode *list = arena_alloc(&command_arena, sizeof(ASTNode));
     list->type = NODE_COMMAND_LIST;
-    list->list.array = NodeArray_create(4);
+    list->list.array = NodeArray_create(&command_arena, 4);
 
 
     while(1) {
         ASTNode *node = logical();
-        if (!node) {
-            free_ast(list);
-            return node;
-        }
+        if (!node) return node;
 
         bool more = false;
         if (check(TOKEN_AND)) {
-            ASTNode *bg = malloc(sizeof(ASTNode));
+            ASTNode *bg = arena_alloc(&command_arena, sizeof(ASTNode));
             bg->type = NODE_BACKGROUND;
             bg->unary.child = node;
             node = bg;
@@ -271,12 +254,9 @@ static ASTNode *command_list() {
             more = true;
         }
 
-        if (!more && list->list.array->size == 0) {
-            free_ast(list);
-            return node;
-        }
-
-        NodeArray_push(list->list.array, node);
+        if (!more && list->list.array->size == 0) return node;
+        
+        NodeArray_push(&command_arena, list->list.array, node);
         if (!more || check(TOKEN_EOF) || check(TOKEN_RIGHT_PAREN)) break;
     }
 
@@ -291,7 +271,6 @@ ASTNode *run_parser() {
     ASTNode *n = command_list();
     if (n && !check(TOKEN_EOF)) {              
         parse_error("unexpected token", scanner.start);
-        free_ast(n);
         n = NULL;
     }
     if (!n) {
@@ -299,39 +278,4 @@ ASTNode *run_parser() {
         fprintf(stderr, "  %s  %*s\x1b[31m^\n\x1b[0m", line, (int)(parser.error_pos - line), "");
     }
     return n;
-}
-
-void free_ast(ASTNode *node) {
-    if (!node) return;
-
-    switch (node->type) {
-        case NODE_COMMAND_LIST:
-        case NODE_PIPELINE:
-            for (int i = 0;i < node->list.array->size;i ++) 
-                free_ast(node->list.array->data[i]);
-            NodeArray_destroy(node->list.array);
-            break;
-        case NODE_LOGICAL_LIST:
-            for (int i = 0;i < node->logical.items->size;i ++) 
-                free_ast(node->logical.items->data[i].node);
-            LogicalArray_destroy(node->logical.items);      
-            break;
-        case NODE_NEGATION:
-        case NODE_BACKGROUND:
-        case NODE_SUBSHELL:
-            free_ast(node->unary.child);    
-            break;
-        case NODE_COMMAND:
-            for (int i = 0;i < node->cmd.args->size;i++)
-                free(node->cmd.args->data[i]);
-            for (int i = 0;i < node->cmd.redirect->size;i++)
-                free(node->cmd.redirect->data[i].target);
-            ArgsArray_destroy(node->cmd.args);
-            RedirectArray_destroy(node->cmd.redirect);
-            break;
-        default:
-            break;
-    }
-
-    free(node);
 }

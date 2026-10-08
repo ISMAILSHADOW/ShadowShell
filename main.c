@@ -1,14 +1,14 @@
 #include <stdio.h>
+#include <errno.h>
 #include <string.h>
+#include <unistd.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <sys/types.h>
 #include <sys/wait.h>
-#include <unistd.h>
-#include "DynamicArray.h"
+#include <sys/types.h>
 #include "globals.h"
 #include "executor.h"
+#include "DataStructures/Arenas/DynamicArray.h"
 
 static void reap_background_processes() {
     for (int i = bg_jobs->size - 1;i >= 0;i--) {
@@ -24,7 +24,9 @@ static void reap_background_processes() {
 }
 
 static void initialize() {
-    bg_jobs = PidArray_create(8);
+    command_arena = arena_create(MB(2));
+    bgjobs_arena = arena_create(KB(2));
+    bg_jobs = PidArray_create(&bgjobs_arena, 8);
     line = NULL;
     size = 0;
     interactive = isatty(STDIN_FILENO);
@@ -35,17 +37,8 @@ void loop_start() {
 
 static void loop_end() {
     reap_background_processes();
-    // ArgsArray_destroy(args);
-    // free(line);
-    // line = NULL;
+    arena_reset(&command_arena);
 }
-
-// void clean_exit() {
-//     ArgsArray_destroy(args);
-//     free(line);
-//     args = NULL;
-//     originalLine = NULL;
-// }
 
 // For later to handle running scripts.
 int exec_from_file(char * filePath);

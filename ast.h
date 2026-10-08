@@ -1,6 +1,6 @@
 #ifndef AST_H
 #define AST_H
-#include "DynamicArray.h"
+#include "DataStructures/Arenas/DynamicArray.h"
 #include "tokenizer.h"
 
 typedef struct ASTNode ASTNode;
