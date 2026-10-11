@@ -26,7 +26,7 @@ Ensure you have `gcc` installed. Clone the repository and compile the source fil
 ```bash
 git clone https://github.com/ISMAILSHADOW/ShadowShell.git
 cd ShadowShell
-gcc main.c ast.c executor.c globals.c tokenizer.c -o ShadowShell
+gcc main.c ast.c executor.c globals.c tokenizer.c DataStructures/Arenas/Arena.c -o ShadowShell
 ```
 
 Run the shell:
