@@ -16,11 +16,15 @@ OpenFDArray *process_fds;
 
 static int execute_ast(ASTNode *node);
 
-static void init_executor() {
+static inline void init_executor() {
     process_fds = OpenFDArray_create(&command_arena, 8);
     running_builtin = false;
+    executing = true;
 }
 
+static inline void clean_executor() {
+    executing = false;
+}
 
 static void backup_fd(int original) {
     int backup = dup(original);
@@ -324,5 +328,6 @@ int execute_command() {
     ASTNode *root = run_parser();
     if (root == NULL) return COMMAND_EMPTY;
     int ret = execute_ast(root);
+    clean_executor();
     return ret;
 }

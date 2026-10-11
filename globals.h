@@ -18,6 +18,11 @@
 #define KB(NUM) ((NUM) * 1024UL)
 #define MB(NUM) ((NUM) * 1024UL * 1024UL)
 
+#define ARG_MAX KB(128)
+#define MAX_ARGS KB(4)
+#define MAX_LINE KB(250)
+#define MAX_NESTING 128 // For subshells
+
 extern char *line;
 // extern char *command;
 extern Parser parser;
@@ -25,7 +30,7 @@ extern Scanner scanner;
 extern PidArray *bg_jobs;
 extern size_t size;
 extern ArenaAllocator bgjobs_arena, command_arena;
-extern bool running_builtin, interactive;
+extern bool running_builtin, interactive, executing;
 
 extern const char *const COLOR_RED;
 extern const char *const COLOR_GREEN;

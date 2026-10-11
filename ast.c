@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 static ASTNode *command_list();
+static int nesting_depth; 
 
 static inline bool check(TokenType type) {
     return parser.current.type == type;
@@ -32,6 +33,7 @@ static Token advance() {
 }
 
 static void init_parser() {
+    nesting_depth = 0;
     parser.error_pos = NULL;
     memset(parser.error_msg, '\0', sizeof(parser.error_msg));
     init_scanner();
@@ -112,6 +114,23 @@ static bool parse_redirect(Redirect *red) {
     return true;
 }
 
+static bool check_command_limits(size_t *arg_total, size_t *arg_count) {
+    *arg_total += peek_token().length;
+    (*arg_count)++;
+
+    if (*arg_total > ARG_MAX) {
+        error_at_current("ShadowShell: argument list too long..\n");
+        return false;
+    }
+
+    if (*arg_count > MAX_ARGS) {
+        error_at_current("ShadowShell: too many arguments.\n");    
+        return false;
+    }
+
+    return true;
+}
+
 static ASTNode *simple_command() {
     RedirectArray *r = RedirectArray_create(&command_arena, 4);
     ArgsArray *a = ArgsArray_create(&command_arena, 4);
@@ -121,8 +140,10 @@ static ASTNode *simple_command() {
     node->cmd.args = a;
     node->cmd.redirect = r;
 
+    size_t arg_total = 0, arg_count = 0;
     while (1) {
         if (is_word(peek_type())) {
+            if (!check_command_limits(&arg_total, &arg_count)) return NULL;
             ArgsArray_push(&command_arena, a, word_text(peek_token()));
             advance();
         } else if (is_redirect_op(peek_type()) || check(TOKEN_IO_NUMBER)) {
@@ -145,8 +166,14 @@ static ASTNode *simple_command() {
 
 static ASTNode *command() {
     if (check(TOKEN_LEFT_PAREN)) { // SubShell
+        if (nesting_depth >= MAX_NESTING) {
+            error_at_current("subshells nesting limit exceeded");
+            return NULL;
+        }
+        nesting_depth++;
         advance();
         ASTNode *node = command_list();
+        nesting_depth--;
         if (!node || !check(TOKEN_RIGHT_PAREN)) {
             error_at_current("expected ')'");
             return NULL;
@@ -202,16 +229,14 @@ static ASTNode *negation() {
 
 
 static ASTNode *logical(void) {
+    ASTNode *node = negation();
+    if (!node || (!check(TOKEN_AND_AND) && !check(TOKEN_OR_OR))) return node;    
+    
     ASTNode *list = arena_alloc(&command_arena, sizeof(ASTNode));
     list->type = NODE_LOGICAL_LIST;
     list->logical.items = LogicalArray_create(&command_arena, 4);
 
     Operator op = OP_AND_AND;          
-    ASTNode *node = negation();
-
-    if (!node) return node;
-    
-
     while(1) {
         LogicalArray_push(&command_arena, list->logical.items, (LogicalNode){ .op = op, .node = node });
 
@@ -225,39 +250,38 @@ static ASTNode *logical(void) {
         if (!node) return node;
 
     }
-    // Only one item means there was no operator, so return the one node
-    if (list->logical.items->size == 1) return node;
     
     return list;
 }
 
 static ASTNode *command_list() {
+    ASTNode *node = logical();
+    if (!node || (!check(TOKEN_AND) && !check(TOKEN_SEMICOLON))) return node;
+
     ASTNode *list = arena_alloc(&command_arena, sizeof(ASTNode));
     list->type = NODE_COMMAND_LIST;
     list->list.array = NodeArray_create(&command_arena, 4);
 
-
-    while(1) {
-        ASTNode *node = logical();
-        if (!node) return node;
-
-        bool more = false;
+    while(1) {        
         if (check(TOKEN_AND)) {
             ASTNode *bg = arena_alloc(&command_arena, sizeof(ASTNode));
             bg->type = NODE_BACKGROUND;
             bg->unary.child = node;
             node = bg;
-            advance();
-            more = true;
-        } else if (check(TOKEN_SEMICOLON)) {
-            advance();
-            more = true;
         }
-
-        if (!more && list->list.array->size == 0) return node;
         
         NodeArray_push(&command_arena, list->list.array, node);
-        if (!more || check(TOKEN_EOF) || check(TOKEN_RIGHT_PAREN)) break;
+        advance();
+
+        if (check(TOKEN_EOF) || check(TOKEN_RIGHT_PAREN)) break;
+
+        node = logical();
+        if (!node) return NULL;
+
+        if (!check(TOKEN_AND) && !check(TOKEN_SEMICOLON)) {        
+            NodeArray_push(&command_arena, list->list.array, node);
+            break;
+        }
     }
 
     return list;

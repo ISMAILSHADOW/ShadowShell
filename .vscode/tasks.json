@@ -12,6 +12,7 @@
                 "${workspaceFolder}/tokenizer.c", 
                 "${workspaceFolder}/ast.c", 
                 "${workspaceFolder}/ast_debug.c", 
+                "${workspaceFolder}/DataStructures/Arenas/Arena.c",
                 "-DDEBUG",
                 "-o",
                 "${workspaceFolder}/ShadowShell"
@@ -32,6 +33,7 @@
                 "${workspaceFolder}/tokenizer.c", 
                 "${workspaceFolder}/ast.c", 
                 "${workspaceFolder}/executor.c", 
+                "${workspaceFolder}/DataStructures/Arenas/Arena.c",
                 "-DDEBUG",
                 "-o",
                 "${workspaceFolder}/ShadowShell"
@@ -54,6 +56,7 @@
                 "${workspaceFolder}/tokenizer.c", 
                 "${workspaceFolder}/ast.c", 
                 "${workspaceFolder}/executor.c", 
+                "${workspaceFolder}/DataStructures/Arenas/Arena.c",
                 "-DDEBUG",
                 "-o",
                 "${workspaceFolder}/ShadowShell"

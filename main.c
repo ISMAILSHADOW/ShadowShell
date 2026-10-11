@@ -24,7 +24,7 @@ static void reap_background_processes() {
 }
 
 static void initialize() {
-    command_arena = arena_create(MB(2));
+    command_arena = arena_create(MB(40));
     bgjobs_arena = arena_create(KB(2));
     bg_jobs = PidArray_create(&bgjobs_arena, 8);
     line = NULL;
@@ -49,7 +49,6 @@ int main(int argc, char **argv) {
     
     // if (argc == 2) 
     //     return exec_from_file(argv[1]);
-
     initialize();
     while (1) {
         // loop_start();
@@ -60,6 +59,10 @@ int main(int argc, char **argv) {
         ssize_t bytes_read = getline(&line, &size, stdin);
         if (bytes_read == -1) 
             break;
+        else if (bytes_read > MAX_LINE) {
+            fprintf(stderr, "ShadowShell: Command is too long. Maximum command size is %d", MAX_LINE);
+            continue;
+        }
 
         int ret = execute_command();
         if (ret == COMMAND_EXIT_SUCCESSFUL)

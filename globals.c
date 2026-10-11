@@ -32,7 +32,7 @@ PidArray *bg_jobs;
 ArenaAllocator bgjobs_arena, command_arena;
 size_t size;
 const char *prompt_color = "\x1b[36m";
-bool running_builtin, interactive;
+bool running_builtin, interactive, executing;
 
 void set_prompt_color(int ret) {
     if (ret == COMMAND_EMPTY)
