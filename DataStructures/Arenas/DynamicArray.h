@@ -46,11 +46,8 @@ void name##_resize(ArenaAllocator *arena, name *arr, size_t new_capacity) { \
     if (arr == NULL) return;                                \
     if (new_capacity < 1) new_capacity = 1;                 \
                                                             \
-    if (arr->capacity < new_capacity) {                     \
-        T *new_data = arena_alloc(arena, sizeof(T) * new_capacity); \
-        memcpy(new_data, arr->data, sizeof(T) * arr->size); \
-        arr->data = new_data;                               \
-    }                                                       \
+    if (arr->capacity < new_capacity)                       \
+        arr->data = arena_realloc(arena, arr->data, sizeof(T) * arr->capacity, sizeof(T) * new_capacity); \
     arr->capacity = new_capacity;                           \
                                                             \
     if (arr->size >= arr->capacity)                         \

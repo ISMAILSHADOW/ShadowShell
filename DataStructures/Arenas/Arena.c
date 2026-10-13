@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include "Arena.h"
 
@@ -39,6 +40,39 @@ void *arena_alloc(ArenaAllocator *arena, size_t size) {
     void *ret = arena->curr;
     arena->curr += size;
     return ret;
+}
+
+void *arena_realloc(ArenaAllocator *arena, void *old, size_t old_size, size_t new_size) {
+    if (arena == NULL) {
+        fprintf(stderr, "Fatal Error: ArenaAllocator: arena_realloc called on NULL arena.\n");
+        _exit(EXIT_FAILURE);
+    }
+
+    if (old == NULL) 
+        return arena_alloc(arena, new_size);
+
+    bool is_top = (uint8_t *)old + old_size == arena->curr;
+
+    if (new_size <= old_size) {
+        if (is_top) 
+            arena->curr -= (old_size - new_size);
+        return old;
+    }
+
+    if (is_top) {
+        size_t growth = new_size - old_size;
+        if (growth > arena->capacity - arena_size(arena)) {
+            fprintf(stderr, "Fatal Error: ArenaAllocator: Out of memory during realloc expansion.\n");
+            _exit(EXIT_FAILURE);
+        }
+        arena->curr += growth;
+
+        return old;
+    }
+
+    void *new_ptr = arena_alloc(arena, new_size);
+    memcpy(new_ptr, old, old_size);
+    return new_ptr;
 }
 
 char *arena_strndup(ArenaAllocator *arena, const char *s, size_t n) {
