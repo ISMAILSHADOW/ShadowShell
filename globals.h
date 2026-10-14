@@ -23,8 +23,6 @@
 #define MAX_LINE KB(250)
 #define MAX_NESTING 128 // For subshells
 
-extern char *line;
-// extern char *command;
 extern Parser parser;
 extern Scanner scanner;
 extern PidArray *bg_jobs;
@@ -57,15 +55,6 @@ typedef enum {
     COMMAND_FAILED = -1,
     COMMAND_SUCCESSFUL = 0,
 } CommandResult;
-
-// Flags for command prefixes.
-typedef struct {
-    bool negate_ret_val;
-    bool time_command;
-} PrefixFlags;
-
-extern PrefixFlags prefix_flags;
-
 
 bool parse_int_const(const char *str, size_t len, int *val);
 

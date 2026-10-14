@@ -13,6 +13,7 @@
                 "${workspaceFolder}/ast.c", 
                 "${workspaceFolder}/ast_debug.c", 
                 "${workspaceFolder}/DataStructures/Arenas/Arena.c",
+                "${workspaceFolder}/DataStructures/Arenas/StringBuilder.c",
                 "-DDEBUG",
                 "-o",
                 "${workspaceFolder}/ShadowShell"
@@ -34,6 +35,7 @@
                 "${workspaceFolder}/ast.c", 
                 "${workspaceFolder}/executor.c", 
                 "${workspaceFolder}/DataStructures/Arenas/Arena.c",
+                "${workspaceFolder}/DataStructures/Arenas/StringBuilder.c",
                 "-DDEBUG",
                 "-o",
                 "${workspaceFolder}/ShadowShell"
@@ -57,6 +59,7 @@
                 "${workspaceFolder}/ast.c", 
                 "${workspaceFolder}/executor.c", 
                 "${workspaceFolder}/DataStructures/Arenas/Arena.c",
+                "${workspaceFolder}/DataStructures/Arenas/StringBuilder.c",
                 "-DDEBUG",
                 "-o",
                 "${workspaceFolder}/ShadowShell"

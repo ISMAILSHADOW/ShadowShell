@@ -17,19 +17,24 @@ ShadowShell is not a basic string-splitting wrapper. It implements a custom lexi
 * **Subshells:** Isolated execution environments enclosed in parentheses (`(cd /tmp && pwd)`).
 * **Logical Operators:** Short-circuit evaluation for `&&` and `||`.
 * **Background Jobs:** Non-blocking execution using the `&` operator with real-time status reporting.
-* **Builtins:** Native implementations of `cd`, `echo`, and `exit`.
+* **Builtins:** Native implementations of `cd`, and `exit`.
 
 ## Building and Running
 
-Ensure you have `gcc` installed. Clone the repository and compile the source files directly:
+Clone the repository and use the build script:
 
 ```bash
 git clone https://github.com/ISMAILSHADOW/ShadowShell.git
 cd ShadowShell
-gcc main.c ast.c executor.c globals.c tokenizer.c DataStructures/Arenas/Arena.c -o ShadowShell
+./build.sh
 ```
 
 Run the shell:
 ```bash
-./shadowshell
+./ShadowShell
+```
+
+Tests can be ran using:
+```bash
+./build.sh test && ./ShadowShell
 ```

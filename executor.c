@@ -149,7 +149,7 @@ static int cd_builtin(ArgsArray *args) {
 }
 
 static int exit_builtin() {
-    return COMMAND_EXIT_SUCCESSFUL;
+    exit(0);
 }
 
 static bool is_builtin(ASTNode *node) {
@@ -323,10 +323,13 @@ static int execute_ast(ASTNode *node) {
     }
 }
 
-int execute_command() {
+int execute_command(char *line) {
     init_executor();
-    ASTNode *root = run_parser();
-    if (root == NULL) return COMMAND_EMPTY;
+    ASTNode *root = run_parser(line);
+    if (root == NULL) {
+        clean_executor();
+        return COMMAND_EMPTY;
+    }
     int ret = execute_ast(root);
     clean_executor();
     return ret;

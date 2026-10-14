@@ -44,6 +44,6 @@ typedef struct {
     const char *current;
 } Scanner;
 
-void init_scanner();
+void init_scanner(char *line);
 Token scan_token();
 #endif

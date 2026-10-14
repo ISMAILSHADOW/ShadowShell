@@ -2,7 +2,7 @@
 #include "globals.h"
 #include <string.h>
 
-void init_scanner() {
+void init_scanner(char *line) {
     scanner.start = line;
     scanner.current = line;
 }
@@ -81,10 +81,11 @@ static bool is_operator_or_space(char c) {
 }
 
 static Token match_identifier() {
+    // TODO: Currently splits args like --name="a d" into IDENTIFER and STRING tokens make them one.
     while (!is_at_end() && !is_operator_or_space(peek())) advance();
     
 
-    if (peek() == '<' || peek() == '>' || match_next("&>")) { // Checks for file descriptors before redirectors.
+    if (peek() == '<' || peek() == '>') { // Checks for file descriptors before redirectors.
         bool all_digits = true;
         for (const char *p = scanner.start; p < scanner.current; p++) {
             if (*p < '0' || *p > '9') {
@@ -109,7 +110,7 @@ Token scan_token() {
     switch (c) {
         case '(': return make_token(TOKEN_LEFT_PAREN);
         case ')': return make_token(TOKEN_RIGHT_PAREN);
-        case '!': return make_token(TOKEN_BANG);
+        case '!': return make_token(TOKEN_BANG); // TODO: ! is its own token anywhere, so echo ! is a syntax error.
         case ';': return make_token(TOKEN_SEMICOLON);
         case '&':
             if (match_next("&"))  return make_token(TOKEN_AND_AND);

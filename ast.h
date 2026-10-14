@@ -76,8 +76,7 @@ typedef struct {
     const char *error_pos;
 } Parser;
 
-ASTNode *run_parser();
-void free_ast(ASTNode *node);
+ASTNode *run_parser(char *line);
 
 #ifdef DEBUG
     void print_ast(const ASTNode *root);

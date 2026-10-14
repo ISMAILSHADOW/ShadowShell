@@ -32,11 +32,11 @@ static Token advance() {
     return parser.current;
 }
 
-static void init_parser() {
+static void init_parser(char *line) {
     nesting_depth = 0;
     parser.error_pos = NULL;
     memset(parser.error_msg, '\0', sizeof(parser.error_msg));
-    init_scanner();
+    init_scanner(line);
     advance();
 }
 
@@ -103,7 +103,7 @@ static bool parse_redirect(Redirect *red) {
     
     if (red->op == TOKEN_LESS_AND || red->op == TOKEN_GREATER_AND) {
         int n;
-        if (!(parse_int_const(peek_token().start, peek_token().length, &n) && n >= 0)) {
+        if (!(parse_int_const(peek_token().start, peek_token().length, &n) && n >= 0) && strncmp(peek_token().start, "-", 1)) {
             error_at_current("expected a file descriptor number or '-'");
             return false;
         }
@@ -288,8 +288,8 @@ static ASTNode *command_list() {
 }
 
 
-ASTNode *run_parser() {
-    init_parser();
+ASTNode *run_parser(char * line) {
+    init_parser(line);
     if (check(TOKEN_EOF)) return NULL; 
 
     ASTNode *n = command_list();

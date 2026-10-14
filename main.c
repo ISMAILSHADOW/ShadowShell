@@ -10,6 +10,8 @@
 #include "executor.h"
 #include "DataStructures/Arenas/DynamicArray.h"
 
+static char *line;
+
 static void reap_background_processes() {
     for (int i = bg_jobs->size - 1;i >= 0;i--) {
         int status;
@@ -41,14 +43,17 @@ static void loop_end() {
 }
 
 // For later to handle running scripts.
-int exec_from_file(char * filePath);
+int exec_from_file(char * filePath) {
+    fprintf(stderr, "exec_from_file IS NOT IMPLEMENTED YET!");
+    _exit(1);
+}
 
 int main(int argc, char **argv) {
     if (argc > 2) 
         return -1;
     
-    // if (argc == 2) 
-    //     return exec_from_file(argv[1]);
+    if (argc == 2) 
+        return exec_from_file(argv[1]);
     initialize();
     while (1) {
         // loop_start();
@@ -59,12 +64,12 @@ int main(int argc, char **argv) {
         ssize_t bytes_read = getline(&line, &size, stdin);
         if (bytes_read == -1) 
             break;
-        else if (bytes_read > MAX_LINE) {
-            fprintf(stderr, "ShadowShell: Command is too long. Maximum command size is %d", MAX_LINE);
+        else if (bytes_read > (ssize_t)MAX_LINE) {
+            fprintf(stderr, "ShadowShell: Command is too long. Maximum command size is %ld", MAX_LINE);
             continue;
         }
 
-        int ret = execute_command();
+        int ret = execute_command(line);
         if (ret == COMMAND_EXIT_SUCCESSFUL)
             break;
         set_prompt_color(ret);
