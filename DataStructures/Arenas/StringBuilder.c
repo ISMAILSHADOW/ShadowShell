@@ -8,7 +8,7 @@
 
 StringBuilder sb_create(ArenaAllocator *arena, size_t capacity) {
     StringBuilder sb;
-    sb.buf = arena_alloc(arena, capacity + 1);
+    sb.buf = (char *)arena_alloc(arena, capacity + 1);
     sb.size = 0;
     sb.buf[sb.size] = '\0';
     sb.capacity = capacity;
@@ -35,7 +35,7 @@ void sb_extend(ArenaAllocator *arena, StringBuilder *s, size_t capacity) {
 }
 
 static inline char *align_pointer(char *ptr) {
-    return (void *)(((uintptr_t)ptr + 7) & ~7ull);
+    return (char *)(((uintptr_t)ptr + 7) & ~7ull);
 }
 
 void sb_append(ArenaAllocator *arena, StringBuilder *s1, StringBuilder *s2) {

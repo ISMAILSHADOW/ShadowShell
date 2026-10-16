@@ -34,10 +34,10 @@ void name##_destroy(ArenaAllocator *arena, name *arr);       \
 #define DEFINE_DYNAMIC_ARRAY(T, name)                       \
                                       \
 name *name##_create(ArenaAllocator *arena, size_t capacity) { \
-    name *arr = arena_alloc(arena, sizeof(name));           \
+    name *arr = (name *)arena_alloc(arena, sizeof(name));           \
     arr->size = 0;                                          \
     arr->capacity = (capacity < 1) ? 1 : capacity;          \
-    arr->data = arena_alloc(arena, sizeof(T) * arr->capacity);\
+    arr->data = (T *)arena_alloc(arena, sizeof(T) * arr->capacity);\
     memset(arr->data, 0, sizeof(T) * arr->capacity);          \
     return arr;                                             \
 }                                                           \
@@ -47,7 +47,7 @@ void name##_resize(ArenaAllocator *arena, name *arr, size_t new_capacity) { \
     if (new_capacity < 1) new_capacity = 1;                 \
                                                             \
     if (arr->capacity < new_capacity)                       \
-        arr->data = arena_realloc(arena, arr->data, sizeof(T) * arr->capacity, sizeof(T) * new_capacity); \
+        arr->data = (T *)arena_realloc(arena, arr->data, sizeof(T) * arr->capacity, sizeof(T) * new_capacity); \
     arr->capacity = new_capacity;                           \
                                                             \
     if (arr->size >= arr->capacity)                         \

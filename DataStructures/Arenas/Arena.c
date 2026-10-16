@@ -81,7 +81,7 @@ char *arena_strndup(ArenaAllocator *arena, const char *s, size_t n) {
     size_t len = 0;
     while (len < n && s[len] != '\0') len++;
     
-    char *ret = arena_alloc(arena, len + 1);
+    char *ret = (char *)arena_alloc(arena, len + 1);
     memcpy(ret, s, len);
     ret[len] = '\0';
     return ret;

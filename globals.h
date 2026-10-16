@@ -57,6 +57,7 @@ typedef enum {
 } CommandResult;
 
 bool parse_int_const(const char *str, size_t len, int *val);
-
-
+bool is_operator(char c);
+bool is_space(char c);
+bool is_quote(char c);
 #endif

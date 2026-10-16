@@ -48,13 +48,16 @@ static inline TokenType peek_type(){
     return parser.current.type;
 }
 
+static inline bool in_quotes(Token token) {
+    return *token.start == '\'' || *token.start == '"';
+}
 
 static inline bool is_word(TokenType token) {
-    return token == TOKEN_IDENTIFIER || token == TOKEN_STRING;
+    return token == TOKEN_IDENTIFIER;
 }
 
 static char *word_text(Token token) {
-    if (token.type == TOKEN_STRING)
+    if (in_quotes(token))
         return arena_strndup(&command_arena, token.start + 1, token.length - 2);   // drop both quotes
     return arena_strndup(&command_arena, token.start, token.length);
 }
@@ -135,7 +138,7 @@ static ASTNode *simple_command() {
     RedirectArray *r = RedirectArray_create(&command_arena, 4);
     ArgsArray *a = ArgsArray_create(&command_arena, 4);
 
-    ASTNode *node = arena_alloc(&command_arena,  sizeof(ASTNode));
+    ASTNode *node = (ASTNode *)arena_alloc(&command_arena,  sizeof(ASTNode));
     node->type = NODE_COMMAND;
     node->cmd.args = a;
     node->cmd.redirect = r;
@@ -180,7 +183,7 @@ static ASTNode *command() {
         }
 
         advance();
-        ASTNode *wrapper = arena_alloc(&command_arena,  sizeof(ASTNode));
+        ASTNode *wrapper = (ASTNode *)arena_alloc(&command_arena,  sizeof(ASTNode));
         wrapper->type = NODE_SUBSHELL;
         wrapper->unary.child = node;
         return wrapper;
@@ -193,7 +196,7 @@ static ASTNode *pipeline() {
     ASTNode *cmd = command();
     if (!check(TOKEN_OR) || !cmd) return cmd;
 
-    ASTNode *node = arena_alloc(&command_arena,  sizeof(ASTNode));
+    ASTNode *node = (ASTNode *)arena_alloc(&command_arena,  sizeof(ASTNode));
     node->type = NODE_PIPELINE;
     node->list.array = NodeArray_create(&command_arena, 4);
     NodeArray_push(&command_arena, node->list.array, cmd);
@@ -221,7 +224,7 @@ static ASTNode *negation() {
     ASTNode *p = pipeline();
     if (!negate || !p) return p;
     
-    ASTNode *node = arena_alloc(&command_arena, sizeof(ASTNode));
+    ASTNode *node = (ASTNode *)arena_alloc(&command_arena, sizeof(ASTNode));
     node->type = NODE_NEGATION;
     node->unary.child = p;
     return node;
@@ -232,7 +235,7 @@ static ASTNode *logical(void) {
     ASTNode *node = negation();
     if (!node || (!check(TOKEN_AND_AND) && !check(TOKEN_OR_OR))) return node;    
     
-    ASTNode *list = arena_alloc(&command_arena, sizeof(ASTNode));
+    ASTNode *list = (ASTNode *)arena_alloc(&command_arena, sizeof(ASTNode));
     list->type = NODE_LOGICAL_LIST;
     list->logical.items = LogicalArray_create(&command_arena, 4);
 
@@ -258,13 +261,13 @@ static ASTNode *command_list() {
     ASTNode *node = logical();
     if (!node || (!check(TOKEN_AND) && !check(TOKEN_SEMICOLON))) return node;
 
-    ASTNode *list = arena_alloc(&command_arena, sizeof(ASTNode));
+    ASTNode *list = (ASTNode *)arena_alloc(&command_arena, sizeof(ASTNode));
     list->type = NODE_COMMAND_LIST;
     list->list.array = NodeArray_create(&command_arena, 4);
 
     while(1) {        
         if (check(TOKEN_AND)) {
-            ASTNode *bg = arena_alloc(&command_arena, sizeof(ASTNode));
+            ASTNode *bg = (ASTNode *)arena_alloc(&command_arena, sizeof(ASTNode));
             bg->type = NODE_BACKGROUND;
             bg->unary.child = node;
             node = bg;

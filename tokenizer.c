@@ -31,6 +31,10 @@ static inline char peek() {
     return *scanner.current;
 }
 
+static inline char prev() {
+    return scanner.current > scanner.start ? *(scanner.current-1) : '\0';
+}
+
 static inline char advance() {
     return *scanner.current++;
 }
@@ -63,27 +67,24 @@ static void skip_whitespace() {
     }
 }
 
-static Token string(char quote_type) {
-    while (peek() != quote_type && !is_at_end()) {
+static Token match_identifier() {
+    bool in_quotes = is_quote(prev()); 
+    char current_quote = is_quote(prev()) ? prev() : '\0';
+    while (!is_at_end() && (in_quotes || (!is_operator(peek()) && !is_space(peek())))) {
+        if (is_quote(peek())) {
+            if (peek() == current_quote) {
+                in_quotes = false;
+                current_quote = '\0';
+            }
+            else if (current_quote == '\0') {
+                in_quotes = true;
+                current_quote = peek();
+            }
+        }
         advance();
     }
-
-    if (is_at_end()) return make_error("\x1b[31mError:\x1b[0m Unterminated string"); 
-
-    advance(); // The closing quote
-    return make_token(TOKEN_STRING);
-}
-
-static bool is_operator_or_space(char c) {
-    return c == ' ' || c == '\r' || c == '\t' || c == '\n' ||
-           c == '|' || c == '&' || c == '<' || c == '>' || c == ';' ||
-           c == '(' || c == ')' || c == '\'' || c == '"' || c == '\0';
-}
-
-static Token match_identifier() {
-    // TODO: Currently splits args like --name="a d" into IDENTIFER and STRING tokens make them one.
-    while (!is_at_end() && !is_operator_or_space(peek())) advance();
     
+    if (in_quotes) return make_error("\x1b[31mError:\x1b[0m Unterminated string"); 
 
     if (peek() == '<' || peek() == '>') { // Checks for file descriptors before redirectors.
         bool all_digits = true;
@@ -129,8 +130,6 @@ Token scan_token() {
             if (match_next(">"))  return make_token(TOKEN_GREATER_GREATER);
             if (match_next("&"))  return make_token(TOKEN_GREATER_AND);
             return make_token(TOKEN_GREATER);
-        case '"': return string('"');
-        case '\'': return string('\'');
         default: 
             return match_identifier();
     }

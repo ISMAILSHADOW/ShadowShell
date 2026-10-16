@@ -62,3 +62,16 @@ bool parse_int_const(const char *str, size_t len, int *val) {
     *val = (int)result;
     return true;
 }
+
+bool is_operator(char c) {
+    return c == '|' || c == '&' || c == '<' || c == '>' || c == ';' ||
+           c == '(' || c == ')' || c == '\0';
+}
+
+bool is_space(char c) {
+    return c == ' ' || c == '\r' || c == '\t' || c == '\n';
+}
+
+bool is_quote(char c) {
+    return c == '\'' || c == '"';
+}

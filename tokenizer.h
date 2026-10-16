@@ -26,7 +26,6 @@ typedef enum {
     // Arbitrary number of characters
     TOKEN_IDENTIFIER,
     TOKEN_IO_NUMBER, // Numbers before redirectors
-    TOKEN_STRING, // String is in quotes identifier is not.
 
     TOKEN_ERROR,
     TOKEN_EOF
