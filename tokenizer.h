@@ -2,7 +2,7 @@
 #define TOKENIZER_H
 #include <stdint.h>
 
-typedef enum {
+typedef enum : uint8_t {
     // Single character tokens
     // TOKEN_SLASH,
     TOKEN_LEFT_PAREN, 
@@ -33,9 +33,9 @@ typedef enum {
 
 
 typedef struct {
-    TokenType type;
     const char* start;
     uint32_t length;
+    TokenType type;
 } Token;
 
 typedef struct {

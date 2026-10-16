@@ -9,6 +9,8 @@
 #include <sys/types.h>
 #include <string.h>
 #include <fcntl.h>
+#include <stdbool.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <signal.h>
 
@@ -36,8 +38,12 @@ static void restore_fds() {
     for (ssize_t i = process_fds->size - 1;i >= 0;i--) {
         int original = process_fds->data[i].fd[0];
         int backup = process_fds->data[i].fd[1];
-        dup2(backup, original);
-        close(backup);
+        if (backup == -1) {
+            close(original);
+        } else {
+            dup2(backup, original);
+            close(backup);
+        }
     }
     process_fds->size = 0;
 }
@@ -148,7 +154,7 @@ static int cd_builtin(ArgsArray *args) {
     return COMMAND_SUCCESSFUL;
 }
 
-static int exit_builtin() {
+static void exit_builtin() {
     exit(0);
 }
 
@@ -168,7 +174,7 @@ static int run_builtin(ASTNode *node) {
     }
 
     if (strcmp(cmd, "cd") == 0) return cd_builtin(args);
-    if (strcmp(cmd, "exit") == 0) return exit_builtin();
+    if (strcmp(cmd, "exit") == 0) exit_builtin();
     if (strcmp(cmd, "true") == 0) return 0;
     if (strcmp(cmd, "false") == 0) return 1;
 
@@ -202,7 +208,7 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
     }
     if (pid == -1) {
         fprintf(stderr, "ShadowShell: fork: %s\n", strerror(errno));
-        return -1;
+        return COMMAND_FAILED;
     }
 
     if (background) {
@@ -214,7 +220,7 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
     int status;
     if (waitpid(pid, &status, 0) == -1) {
         fprintf(stderr, "ShadowShell: waitpid: %s\n", strerror(errno));
-        return -1;
+        return COMMAND_FAILED;
     }
 
     if (WIFEXITED(status)) {
@@ -246,7 +252,7 @@ static int run_pipeline(ASTNode *node) {
         if (pipe(p.fd) == -1) {
             fprintf(stderr, "ShadowShell: pipe: %s\n", strerror(errno));
             close_pipe_array(pipes);
-            return -1;
+            return COMMAND_FAILED;
         }
         PipeArray_push(&command_arena, pipes, p);
     }
@@ -267,22 +273,25 @@ static int run_pipeline(ASTNode *node) {
                 _exit(run_subprocess(cur, false, true));
             _exit(execute_ast(cur));
         } else if (pid == -1) {
-            for (size_t j = 0; j < pids->size; j++)
+            for (size_t j = 0; j < pids->size; j++) {
                 kill(pids->data[j], SIGKILL);
+                waitpid(pids->data[j], NULL, 0);
+            }
             close_pipe_array(pipes);
-            return -1;
+            return COMMAND_FAILED;
         }
         PidArray_push(&command_arena, pids, pid);
     }
     
     close_pipe_array(pipes);
     
-    int status, ret = -1;
+    int status, ret = COMMAND_FAILED;
     for (size_t i = 0;i < pids->size;i++) {
         if (waitpid(pids->data[i], &status, 0) == pids->data[i]) {
             if (WIFEXITED(status)) ret = WEXITSTATUS(status);
-            else ret = -1;
-        } else ret = -1;
+            else if (WIFSIGNALED(status)) ret = 128 + WTERMSIG(status);
+            else ret = COMMAND_FAILED;
+        } else ret = COMMAND_FAILED;
     }
     return ret;
 }
@@ -328,7 +337,7 @@ int execute_command(char *line) {
     ASTNode *root = run_parser(line);
     if (root == NULL) {
         clean_executor();
-        return COMMAND_EMPTY;
+        return parser.error_pos ? COMMAND_FAILED : COMMAND_EMPTY;
     }
     int ret = execute_ast(root);
     clean_executor();

@@ -1,8 +1,6 @@
 #include <stdio.h>
-#include <errno.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -55,6 +53,7 @@ int main(int argc, char **argv) {
     if (argc == 2) 
         return exec_from_file(argv[1]);
     initialize();
+    int last_status = 0;
     while (1) {
         // loop_start();
 
@@ -70,13 +69,12 @@ int main(int argc, char **argv) {
         }
 
         int ret = execute_command(line);
-        if (ret == COMMAND_EXIT_SUCCESSFUL)
-            break;
+        if (ret != COMMAND_EMPTY)
+            last_status = ret;
         set_prompt_color(ret);
 
         loop_end();
     }
 
-    // clean_exit();
-    return 0;
+    return last_status;
 }

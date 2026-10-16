@@ -39,21 +39,9 @@ extern const char *prompt_color;
 void set_prompt_color(int ret);
 
 typedef enum {
-    COMMAND_UNKNOWN,
-    ECHO,
-    EXIT,
-    CD
-} CommandType;
-
-typedef enum {
-    INT_OVERFLOW,
-} IntParseStatus;
-
-typedef enum {
-    COMMAND_EMPTY = -3,
-    COMMAND_EXIT_SUCCESSFUL = -2,
-    COMMAND_FAILED = -1,
+    COMMAND_EMPTY = -1,
     COMMAND_SUCCESSFUL = 0,
+    COMMAND_FAILED = 1,
 } CommandResult;
 
 bool parse_int_const(const char *str, size_t len, int *val);

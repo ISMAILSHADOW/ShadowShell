@@ -12,7 +12,7 @@ DECLARE_DYNAMIC_ARRAY(ASTNode *, NodeArray)
 DECLARE_DYNAMIC_ARRAY(Redirect, RedirectArray)
 DECLARE_DYNAMIC_ARRAY(LogicalNode, LogicalArray)
 
-typedef enum {
+typedef enum : uint8_t {
     NODE_COMMAND,
     NODE_PIPELINE,
     NODE_COMMAND_LIST,
@@ -23,7 +23,7 @@ typedef enum {
 } NodeType;
 
 
-typedef enum {
+typedef enum : uint8_t {
     OP_AND_AND,
     OP_OR_OR,
     OP_SEMICOLON,
@@ -33,9 +33,9 @@ typedef enum {
 
 
 struct Redirect {
-   int fd;
-   TokenType op;
     char *target;
+    int fd;
+    TokenType op;
 };
 
 typedef struct {
@@ -71,9 +71,9 @@ struct ASTNode {
 };
 
 typedef struct {
-    Token current;
     char error_msg[128];
     const char *error_pos;
+    Token current;
 } Parser;
 
 ASTNode *run_parser(char *line);

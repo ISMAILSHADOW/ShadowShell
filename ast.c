@@ -106,7 +106,7 @@ static bool parse_redirect(Redirect *red) {
     
     if (red->op == TOKEN_LESS_AND || red->op == TOKEN_GREATER_AND) {
         int n;
-        if (!(parse_int_const(peek_token().start, peek_token().length, &n) && n >= 0) && strncmp(peek_token().start, "-", 1)) {
+        if (!(parse_int_const(peek_token().start, peek_token().length, &n) && n >= 0) && !(peek_token().length == 1 && peek_token().start[0] == '-')) {
             error_at_current("expected a file descriptor number or '-'");
             return false;
         }

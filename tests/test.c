@@ -308,9 +308,12 @@ TestCase tests[NUM_TESTS] = {
     {.name="SB 8: NULL input",                      .timeout=2, .fn=SBTest8,},
 };
 
-int main() {
-    for (int i = 0;i < NUM_TESTS;i++) {
-        run_test(&tests[i]);
+int main(void) {
+    int failures = 0;
+    for (int i = 0; i < NUM_TESTS; i++) {
+        if (!run_test(&tests[i]))
+            failures++;
     }
-    return 0;
+    printf("Tests: %d passed, %d failed, %d total\n", NUM_TESTS - failures, failures, NUM_TESTS);
+    return failures ? 1 : 0;
 }

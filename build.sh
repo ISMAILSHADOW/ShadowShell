@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-CFLAGS="-O3" 
+CFLAGS="-O3 -flto" 
 DEBUG=false
 
 TEST_FILES="tests/test.c tests/ast_debug.c"
