@@ -23,12 +23,13 @@ DEFINE_DYNAMIC_ARRAY(Redirect, RedirectArray)
 DEFINE_DYNAMIC_ARRAY(LogicalNode, LogicalArray)
 DEFINE_DYNAMIC_ARRAY(FDPair, PipeArray)
 DEFINE_DYNAMIC_ARRAY(pid_t, PidArray)
+DEFINE_DYNAMIC_ARRAY(Process, ProcessArray)
 DEFINE_DYNAMIC_ARRAY(FDPair, OpenFDArray)
 
 Scanner scanner;
 Parser parser;
-PidArray *bg_jobs;
-ArenaAllocator bgjobs_arena, command_arena;
+ProcessArray *jobs;
+ArenaAllocator jobs_arena, command_arena;
 size_t size;
 const char *prompt_color = "\x1b[36m";
 bool running_builtin, interactive, executing;
@@ -54,12 +55,12 @@ bool parse_int_const(const char *str, size_t len, int *val) {
     char *endptr; 
     errno = 0; // errno must be zeroed as the man page says strtol doesn't reset it on success
     long result = strtol(buf, &endptr, 10);
+    *val = (int)result;
 
     if (endptr == buf || *endptr != '\0') return false;
     
     // Check overflow, underflow and int range
     if (result < INT32_MIN || result > INT32_MAX || errno == ERANGE) return false;
-    *val = (int)result;
     return true;
 }
 

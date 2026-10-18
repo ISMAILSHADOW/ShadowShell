@@ -25,9 +25,9 @@
 
 extern Parser parser;
 extern Scanner scanner;
-extern PidArray *bg_jobs;
+extern ProcessArray *jobs, *jobs;
 extern size_t size;
-extern ArenaAllocator bgjobs_arena, command_arena;
+extern ArenaAllocator jobs_arena, command_arena;
 extern bool running_builtin, interactive, executing;
 
 extern const char *const COLOR_RED;

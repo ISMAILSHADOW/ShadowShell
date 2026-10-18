@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -11,25 +12,38 @@
 static char *line;
 
 static void reap_background_processes() {
-    for (int i = bg_jobs->size - 1;i >= 0;i--) {
+    for (int i = jobs->size - 1;i >= 0;i--) {
         int status;
-        pid_t pid = waitpid(bg_jobs->data[i], &status, WNOHANG);
-        if (pid == bg_jobs->data[i]) {
-            PidArray_remove(bg_jobs, i);
+        pid_t pid = waitpid(jobs->data[i].pid, &status, WNOHANG);
+        if (pid == jobs->data[i].pid) {
+            ProcessArray_remove(jobs, i);
             printf(YELLOW "[%d] " RESET "DONE\n", i);
         } else if (pid == -1) {
-            PidArray_remove(bg_jobs, i);
+            ProcessArray_remove(jobs, i);
         }
     }
 }
 
+void sigint_handler(int signum) {
+    (void) signum;
+    if (!executing) write(STDOUT_FILENO, "\n" YELLOW "$ " RESET, 12);
+}
+
+static void handle_signals() {
+    struct sigaction sa = {.sa_handler=sigint_handler, .sa_flags=SA_RESTART};
+    sigaction(SIGINT, &sa, NULL);
+    signal(SIGTSTP, SIG_IGN);
+}
+
 static void initialize() {
     command_arena = arena_create(MB(40));
-    bgjobs_arena = arena_create(KB(2));
-    bg_jobs = PidArray_create(&bgjobs_arena, 8);
+    jobs_arena = arena_create(MB(20));
+    jobs = ProcessArray_create(&jobs_arena, 8);
+    jobs = ProcessArray_create(&jobs_arena, 8);
     line = NULL;
     size = 0;
     interactive = isatty(STDIN_FILENO);
+    handle_signals();
 }
 
 void loop_start() {
@@ -44,6 +58,11 @@ static void loop_end() {
 int exec_from_file(char * filePath) {
     fprintf(stderr, "exec_from_file IS NOT IMPLEMENTED YET!");
     _exit(1);
+}
+
+void clean_exit() {
+    for (size_t i = 0;i < jobs->size;i++) 
+        kill(jobs->data[i].pid, SIGHUP);
 }
 
 int main(int argc, char **argv) {
@@ -76,5 +95,6 @@ int main(int argc, char **argv) {
         loop_end();
     }
 
+    clean_exit();
     return last_status;
 }

@@ -158,10 +158,119 @@ static void exit_builtin() {
     exit(0);
 }
 
+static inline void take_terminal_control() {
+    signal(SIGTTOU, SIG_IGN);
+    tcsetpgrp(STDIN_FILENO, getpid());
+    signal(SIGTTOU, SIG_DFL);
+}
+
+static inline void give_terminal_control(pid_t pid) {
+    tcsetpgrp(STDIN_FILENO, pid);
+}
+
+static int handle_child_status(pid_t pid, pid_t pgid, int status) {
+    int ret = -1;
+    if (WIFEXITED(status)) {
+        ret = WEXITSTATUS(status);
+    } else if (WIFSIGNALED(status)) {
+        int sig = WTERMSIG(status);
+        if (sig == SIGINT) executing = false;
+        fprintf(stderr, "%s\n", strsignal(sig));  
+        ret = 128 + sig;  // Convention for termination by signals
+    } else if (WIFSTOPPED(status)) {
+        executing = false;
+        printf("\nShadowShell: suspended: " YELLOW "[%d] " RESET "\n", jobs->size);
+        ProcessArray_push(&jobs_arena, jobs, (Process){.pid=pid, .pgid=pgid, .running=false});
+    }
+    return ret;
+}
+
+static int wait_for_child(pid_t pid, pid_t pgid) {
+    int status;
+    if (waitpid(pid, &status, WUNTRACED) == -1) {
+        take_terminal_control();
+        fprintf(stderr, "ShadowShell: waitpid: %s\n", strerror(errno));
+        return COMMAND_FAILED;
+    }
+
+    take_terminal_control();
+    return handle_child_status(pid, pgid, status);
+}
+
+static int fg(ArgsArray *args) {
+    if (jobs->size == 0) return 0;
+    if (args->size > 2) {
+        fprintf(stderr, "ShadowShell: fg: Expected 0 or 1 arguments (Job ID).\n");
+        return COMMAND_FAILED;
+    }
+
+    int id = jobs->size - 1;
+    if (args->size == 2) {
+        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= jobs->size){
+            fprintf(stderr, "ShadowShell: fg: Invalid Job ID [%d]\n", id);
+            return COMMAND_FAILED;
+        }
+    }
+
+    Process proc;
+    ProcessArray_get(jobs, &proc, id);
+    ProcessArray_remove(jobs, id);
+
+    give_terminal_control(proc.pgid);
+    // Negative is used to wake entire group. I think otherwize pipelines may break.
+    if (!proc.running) kill(-proc.pgid, SIGCONT); 
+
+    int ret = wait_for_child(proc.pid, proc.pgid);
+    return ret;
+}
+
+static int bg(ArgsArray *args) {
+    if (jobs->size == 0) return 0;
+    if (args->size > 2) {
+        fprintf(stderr, "ShadowShell: bg: Expected 0 or 1 arguments (Job ID).\n");
+        return COMMAND_FAILED;
+    }
+
+    int id = jobs->size - 1;
+    if (args->size == 2) {
+        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= jobs->size){
+            fprintf(stderr, "ShadowShell: bg: Invalid Job ID [%d]\n", id);
+            return COMMAND_FAILED;
+        }
+    }
+
+    if (jobs->data[id].running) {
+        printf("bg: job already in background.\n", id);
+        return 0;
+    }
+
+    kill(-jobs->data[id].pgid, SIGCONT);
+    for (size_t i = 0;i < jobs->size;i++) {
+        if (jobs->data[i].pgid == jobs->data[id].pgid)
+            jobs->data[i].running = true;
+    }
+    
+    printf("ShadowShell: continued: " YELLOW "[%d] " RESET "\n", id);
+    return 0;
+}
+
+static int jobs_cmd() {
+    for (size_t i = 0;i < jobs->size;i++) {
+        Process proc = jobs->data[i];
+        if (jobs->data[i].running)
+            printf(YELLOW "[%d] is running. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
+        else
+            printf(YELLOW "[%d] is suspended. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
+    }
+    return 0;
+}
+
+
 static bool is_builtin(ASTNode *node) {
     if (node->type != NODE_COMMAND || node->cmd.args->size == 0) return false;
     const char *cmd = node->cmd.args->data[0];
-    return (strcmp(cmd, "cd") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "true") == 0 || strcmp(cmd, "false") == 0);
+    return strcmp(cmd, "cd") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "true") == 0 || strcmp(cmd, "false") == 0
+            || strcmp(cmd, "fg") == 0 || strcmp(cmd, "bg") == 0 || strcmp(cmd, "jobs") == 0;
 }
 
 static int run_builtin(ASTNode *node) {
@@ -177,6 +286,9 @@ static int run_builtin(ASTNode *node) {
     if (strcmp(cmd, "exit") == 0) exit_builtin();
     if (strcmp(cmd, "true") == 0) return 0;
     if (strcmp(cmd, "false") == 0) return 1;
+    if (strcmp(cmd, "fg") == 0) return fg(args);
+    if (strcmp(cmd, "bg") == 0) return bg(args);
+    if (strcmp(cmd, "jobs") == 0) return jobs_cmd();
 
     return COMMAND_FAILED;
 }
@@ -188,9 +300,16 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
         restore_fds(); running_builtin = false;
         return ret;
     }
+
     int ret = -1; pid_t pid = -1;
-    if (!already_forked) pid = fork();
+    if (!already_forked) {
+        pid = fork();
+        setpgid(pid, pid);
+        if (!background) give_terminal_control(pid);
+    }
+    
     if (pid == 0 || already_forked) {
+        signal(SIGTSTP, SIG_DFL);
         if (node->type == NODE_COMMAND) {
             if (node->cmd.redirect->size != 0)
                 if (!handle_redirects(node->cmd.redirect)) 
@@ -206,31 +325,19 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
         } 
         _exit(ret);
     }
+
     if (pid == -1) {
         fprintf(stderr, "ShadowShell: fork: %s\n", strerror(errno));
         return COMMAND_FAILED;
     }
 
     if (background) {
-        PidArray_push(&bgjobs_arena, bg_jobs, pid);
-        printf(YELLOW "[%zu] %d" RESET "\n" , bg_jobs->size - 1, pid);
+        ProcessArray_push(&jobs_arena, jobs, (Process){.pid=pid, .pgid=pid, .running=true});
+        printf(YELLOW "[%zu] %d" RESET "\n" , jobs->size - 1, pid);
         return 0;
     }
 
-    int status;
-    if (waitpid(pid, &status, 0) == -1) {
-        fprintf(stderr, "ShadowShell: waitpid: %s\n", strerror(errno));
-        return COMMAND_FAILED;
-    }
-
-    if (WIFEXITED(status)) {
-        ret = WEXITSTATUS(status);
-    } else if (WIFSIGNALED(status)) {
-        int sig = WTERMSIG(status);
-        fprintf(stderr, "%s\n", strsignal(sig));  
-        ret = 128 + sig;  // Convention for termination by signals
-    }
-    return ret;
+    return wait_for_child(pid, pid);
 }
 
 
@@ -257,12 +364,20 @@ static int run_pipeline(ASTNode *node) {
         PipeArray_push(&command_arena, pipes, p);
     }
 
+    pid_t group_id = -1;
     for (size_t i = 0;i < pline_size;i++) {
         ASTNode *cur = node->list.array->data[i];
         NodeType type = cur->type;
 
         pid_t pid = fork();
+        if (group_id == -1) group_id = pid;
+        
+        setpgid(pid, group_id);
+        if (i == 0) give_terminal_control(group_id); // Call only for first process in the group. It's redundant.
+
         if (pid == 0) {
+            signal(SIGTSTP, SIG_DFL);
+
             if (i > 0)  // We can read from i - 1
                 dup2(pipes->data[i-1].fd[0], STDIN_FILENO);
             if (i < (pline_size - 1)) // We can write to i
@@ -273,6 +388,7 @@ static int run_pipeline(ASTNode *node) {
                 _exit(run_subprocess(cur, false, true));
             _exit(execute_ast(cur));
         } else if (pid == -1) {
+            take_terminal_control();
             for (size_t j = 0; j < pids->size; j++) {
                 kill(pids->data[j], SIGKILL);
                 waitpid(pids->data[j], NULL, 0);
@@ -286,13 +402,13 @@ static int run_pipeline(ASTNode *node) {
     close_pipe_array(pipes);
     
     int status, ret = COMMAND_FAILED;
-    for (size_t i = 0;i < pids->size;i++) {
-        if (waitpid(pids->data[i], &status, 0) == pids->data[i]) {
-            if (WIFEXITED(status)) ret = WEXITSTATUS(status);
-            else if (WIFSIGNALED(status)) ret = 128 + WTERMSIG(status);
-            else ret = COMMAND_FAILED;
-        } else ret = COMMAND_FAILED;
+    for (size_t i = 0;i < pids->size;i++)  {
+        waitpid(pids->data[i], &status, WUNTRACED);
+        if (i == 0) take_terminal_control();
+        ret = handle_child_status(pids->data[i], pids->data[0], status);
     }
+
+    
     return ret;
 }
 
@@ -302,15 +418,20 @@ static int execute_ast(ASTNode *node) {
     if (node == NULL) return ret;
     switch (node->type) {
         case NODE_COMMAND_LIST:
-            for (size_t i = 0;i < node->list.array->size;i++) 
+            for (size_t i = 0;i < node->list.array->size;i++) {
                 ret = execute_ast(node->list.array->data[i]);
+                if (!executing) return ret;
+            } 
+                
             return ret;
         case NODE_LOGICAL_LIST:
             ret = execute_ast(node->logical.items->data[0].node);
+            if (!executing) return ret;
             for (size_t i = 1;i < node->logical.items->size;i++) {
                 Operator op = node->logical.items->data[i].op;
                 if ((op == OP_AND_AND && success(ret)) || (op == OP_OR_OR && !success(ret)))
                     ret = execute_ast(node->logical.items->data[i].node);
+                if (!executing) return ret;
             }
             return ret;
         case NODE_NEGATION:
@@ -320,7 +441,7 @@ static int execute_ast(ASTNode *node) {
             ret = run_pipeline(node);
             return ret;
         case NODE_BACKGROUND:
-            ret = run_subprocess(node, true, false);
+            ret = run_subprocess(node->unary.child, true, false);
             return ret;
         case NODE_SUBSHELL:
         case NODE_COMMAND:

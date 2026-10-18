@@ -52,11 +52,11 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 },
-                {
-                    "description": "Enable GDB to follow child processes on fork",
-                    "text": "-gdb-set follow-fork-mode child",
-                    "ignoreFailures": false
-                },
+                // {
+                //     "description": "Enable GDB to follow child processes on fork",
+                //     "text": "-gdb-set follow-fork-mode child",
+                //     "ignoreFailures": false
+                // },
                 // {
                 //     "description": "Keep parent process suspended but attached",
                 //     "text": "-gdb-set detach-on-fork off",
