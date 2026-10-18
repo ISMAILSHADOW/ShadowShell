@@ -65,7 +65,7 @@ static bool redirect_file(char *path, int flags, int fd) {
         close(file);
         return false;
     }
-    close(file);
+    if (file != fd) close(file);
     return true;
 }
 
@@ -249,7 +249,7 @@ static int bg(ArgsArray *args) {
         if (jobs->data[i].pgid == jobs->data[id].pgid)
             jobs->data[i].running = true;
     }
-    
+
     printf("ShadowShell: continued: " YELLOW "[%d] " RESET "\n", id);
     return 0;
 }
