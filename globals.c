@@ -30,9 +30,10 @@ Scanner scanner;
 Parser parser;
 ProcessArray *jobs;
 ArenaAllocator jobs_arena, command_arena;
+pid_t job_pgid;
 size_t size;
 const char *prompt_color = "\x1b[36m";
-bool running_builtin, interactive, executing;
+bool running_builtin, interactive, executing, job_background;
 
 void set_prompt_color(int ret) {
     if (ret == COMMAND_EMPTY)

@@ -40,6 +40,8 @@ static void initialize() {
     jobs_arena = arena_create(MB(20));
     jobs = ProcessArray_create(&jobs_arena, 8);
     jobs = ProcessArray_create(&jobs_arena, 8);
+    job_pgid = -1;
+    job_background = false;
     line = NULL;
     size = 0;
     interactive = isatty(STDIN_FILENO);

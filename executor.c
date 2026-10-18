@@ -188,12 +188,12 @@ static int handle_child_status(pid_t pid, pid_t pgid, int status) {
 static int wait_for_child(pid_t pid, pid_t pgid) {
     int status;
     if (waitpid(pid, &status, WUNTRACED) == -1) {
-        take_terminal_control();
+        if (!job_background) take_terminal_control();
         fprintf(stderr, "ShadowShell: waitpid: %s\n", strerror(errno));
         return COMMAND_FAILED;
     }
 
-    take_terminal_control();
+    if (!job_background) take_terminal_control();
     return handle_child_status(pid, pgid, status);
 }
 
@@ -304,8 +304,14 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
     int ret = -1; pid_t pid = -1;
     if (!already_forked) {
         pid = fork();
-        setpgid(pid, pid);
-        if (!background) give_terminal_control(pid);
+
+        if (background && pid == 0) {
+            job_background = true;
+            job_pgid = getpid();
+        }
+
+        setpgid(pid, job_background ? job_pgid : pid);
+        if (!job_background && !background) give_terminal_control(pid);
     }
     
     if (pid == 0 || already_forked) {
@@ -320,8 +326,11 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
             ret = execvp(node->cmd.args->data[0], node->cmd.args->data);
             fprintf(stderr, "ShadowShell: %s: %s\n", node->cmd.args->data[0], strerror(errno));
         }
-        else {
+        else if (node->type == NODE_SUBSHELL) {
             ret = execute_ast(node->unary.child);
+        }
+        else {
+            ret = execute_ast(node);
         } 
         _exit(ret);
     }
@@ -370,10 +379,10 @@ static int run_pipeline(ASTNode *node) {
         NodeType type = cur->type;
 
         pid_t pid = fork();
-        if (group_id == -1) group_id = pid;
+        if (group_id == -1) group_id = job_background ? job_pgid : pid;
         
         setpgid(pid, group_id);
-        if (i == 0) give_terminal_control(group_id); // Call only for first process in the group. It's redundant.
+        if (i == 0 && !job_background) give_terminal_control(group_id); // Call only for first process in the group. It's redundant.
 
         if (pid == 0) {
             signal(SIGTSTP, SIG_DFL);
@@ -388,7 +397,7 @@ static int run_pipeline(ASTNode *node) {
                 _exit(run_subprocess(cur, false, true));
             _exit(execute_ast(cur));
         } else if (pid == -1) {
-            take_terminal_control();
+            if (!job_background) take_terminal_control();
             for (size_t j = 0; j < pids->size; j++) {
                 kill(pids->data[j], SIGKILL);
                 waitpid(pids->data[j], NULL, 0);
@@ -404,7 +413,7 @@ static int run_pipeline(ASTNode *node) {
     int status, ret = COMMAND_FAILED;
     for (size_t i = 0;i < pids->size;i++)  {
         waitpid(pids->data[i], &status, WUNTRACED);
-        if (i == 0) take_terminal_control();
+        if (i == 0 && !job_background) take_terminal_control();
         ret = handle_child_status(pids->data[i], pids->data[0], status);
     }
 

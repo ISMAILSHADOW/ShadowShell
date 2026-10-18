@@ -28,7 +28,8 @@ extern Scanner scanner;
 extern ProcessArray *jobs, *jobs;
 extern size_t size;
 extern ArenaAllocator jobs_arena, command_arena;
-extern bool running_builtin, interactive, executing;
+extern pid_t job_pgid;
+extern bool running_builtin, interactive, executing, job_background;
 
 extern const char *const COLOR_RED;
 extern const char *const COLOR_GREEN;
