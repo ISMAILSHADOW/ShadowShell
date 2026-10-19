@@ -5,7 +5,7 @@
 #include "tokenizer.h"
 #include "ast.h"
 #include "executor.h"
-#include <stdbool.h>
+#include <stdio.h>
 #include <stddef.h>
 
 #define RED    "\x1b[31m"
@@ -29,6 +29,7 @@ extern ProcessArray *jobs, *jobs;
 extern size_t size;
 extern ArenaAllocator jobs_arena, command_arena;
 extern pid_t job_pgid;
+extern FILE *script_file;
 extern bool running_builtin, interactive, executing, job_background;
 
 extern const char *const COLOR_RED;

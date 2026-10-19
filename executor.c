@@ -175,7 +175,7 @@ static int handle_child_status(pid_t pid, pid_t pgid, int status) {
     } else if (WIFSIGNALED(status)) {
         int sig = WTERMSIG(status);
         if (sig == SIGINT) executing = false;
-        fprintf(stderr, "%s\n", strsignal(sig));  
+        fprintf(stderr, " %s\n", strsignal(sig));  
         ret = 128 + sig;  // Convention for termination by signals
     } else if (WIFSTOPPED(status)) {
         executing = false;

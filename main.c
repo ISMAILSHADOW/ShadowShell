@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <sys/wait.h>
 #include <sys/types.h>
 #include "globals.h"
@@ -39,7 +40,6 @@ static void initialize() {
     command_arena = arena_create(MB(40));
     jobs_arena = arena_create(MB(20));
     jobs = ProcessArray_create(&jobs_arena, 8);
-    jobs = ProcessArray_create(&jobs_arena, 8);
     job_pgid = -1;
     job_background = false;
     line = NULL;
@@ -56,10 +56,14 @@ static void loop_end() {
     arena_reset(&command_arena);
 }
 
-// For later to handle running scripts.
-int exec_from_file(char * filePath) {
-    fprintf(stderr, "exec_from_file IS NOT IMPLEMENTED YET!");
-    _exit(1);
+bool exec_from_file(char * filePath) {
+    script_file = fopen(filePath, "r");
+    if (script_file == NULL) {
+        fprintf(stderr, "ShadowShell: %s: %s\n", filePath, strerror(errno));
+        return false;
+    }
+    interactive = false;
+    return true;
 }
 
 void clean_exit() {
@@ -71,17 +75,24 @@ int main(int argc, char **argv) {
     if (argc > 2) 
         return -1;
     
-    if (argc == 2) 
-        return exec_from_file(argv[1]);
     initialize();
+
+    if (argc == 2) {
+        if (!exec_from_file(argv[1])) 
+            return EXIT_FAILURE;
+    }
+
+    FILE *input = script_file ? script_file : stdin;
     int last_status = 0;
     while (1) {
         // loop_start();
 
-        if (interactive)
+        if (interactive){
             printf("%s$ %s", prompt_color, COLOR_RESET);
+            fflush(stdout);
+        }
 
-        ssize_t bytes_read = getline(&line, &size, stdin);
+        ssize_t bytes_read = getline(&line, &size, input);
         if (bytes_read == -1) 
             break;
         else if (bytes_read > (ssize_t)MAX_LINE) {

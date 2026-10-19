@@ -5,7 +5,7 @@
 #include "ast.h"
 #include "executor.h"
 #include <errno.h>
-#include <stdbool.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -30,6 +30,7 @@ Scanner scanner;
 Parser parser;
 ProcessArray *jobs;
 ArenaAllocator jobs_arena, command_arena;
+FILE *script_file;
 pid_t job_pgid;
 size_t size;
 const char *prompt_color = "\x1b[36m";
