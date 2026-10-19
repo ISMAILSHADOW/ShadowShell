@@ -91,10 +91,10 @@ parse, execute, clean up. Follow those three calls.
    Background nodes call `run_subprocess` with `background = true`, which
    skips the wait.
 
-3. `arena_reset(&command_arena)` at the end of `execute_command`. Every
+3. `arena_reset(&command_arena)` at the end of the loop. Every
    allocation during a single command (tokens, AST nodes, argument strings,
    redirect arrays, the backup fd table) lives in one arena and is thrown
-   away together. See the Memory model section below.
+   away together. 
 
 
 If you want the two files that carry the interesting mechanics: `executor.c`
