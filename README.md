@@ -52,44 +52,6 @@ Deliberate non-goals, not oversights:
 - Escape sequences inside strings: `\n`, `\"`
 - Line continuation: `\` at end of line
 
-## How to read the code
-
-Start at `main.c`. The whole shell is driven by one call:
-
-    int ret = execute_command(line);
-
-`execute_command` lives at the bottom of `executor.c` and does four things:
-parse, execute, clean up. Follow those three calls.
-
-1. `run_parser(line)` in `ast.c` calls `init_parser`, which calls
-   `init_scanner` in `tokenizer.c` and `scan_token()` to get the first token,
-   then `command_list()` to build the AST. The precedence chain is
-   `command_list` -> `logical` -> `negation` -> `pipeline` -> `command`.
-   Each layer handles one operator precedence level. The AST node type is a
-   tagged union in `ast.h`.
-
-2. `execute_ast(root)` is a switch on `node->type`. Commands and subshells
-   go through `run_subprocess`. Pipelines go through `run_pipeline`, which
-   sets up `pipe()`s and `fork()`s each stage into the same process group.
-   Background nodes call `run_subprocess` with `background = true`, which
-   skips the wait.
-
-3. **Arena allocator** (`DataStructures/Arenas/Arena.c`): The code uses an Arena allocator to simplify memory management. 
-one `malloc` at
-  startup, a bump pointer, a reset per command. This was much faster than manually using malloc and free on each object individually and much easier to handle. I previously had several memory leaks which the arena resolved.
-
-4. `arena_reset(&command_arena)`. Every allocation during a single command
-   (tokens, AST nodes, argument strings, redirect arrays, the backup fd
-   table) lives in one arena. It is reset once per line. Nothing is freed
-   individually.
-
-
-
-If you want the two files that carry the interesting mechanics: `executor.c`
-(how a shell talks to the kernel) and `tokenizer.c` (how a shell reads input
-without a regex library).
-
-
 ## Building And Running
 ```bash
 ./build.sh &&  ./ShadowShell
@@ -106,6 +68,39 @@ Scripts can also be run directly with a shebang line:
 ```bash
 #!/path/to/ShadowShell
 ```
+
+## How to read the code
+
+Start at `main.c`. The whole shell is driven by one call:
+
+    int ret = execute_command(line);
+
+`execute_command` lives at the bottom of `executor.c` and does three things:
+parse, execute, clean up. Follow those three calls.
+
+1. `run_parser(line)` in `ast.c` calls `init_parser`, which calls
+   `init_scanner` in `tokenizer.c` and `scan_token()` to get the first token,
+   then `command_list()` to build the AST. The precedence chain is
+   `command_list` -> `logical` -> `negation` -> `pipeline` -> `command`.
+   Each layer handles one operator precedence level. The AST node type is a
+   tagged union in `ast.h`.
+
+2. `execute_ast(root)` is a switch on `node->type`. Commands and subshells
+   go through `run_subprocess`. Pipelines go through `run_pipeline`, which
+   sets up `pipe()`s and `fork()`s each stage into the same process group.
+   Background nodes call `run_subprocess` with `background = true`, which
+   skips the wait.
+
+3. `arena_reset(&command_arena)` at the end of `execute_command`. Every
+   allocation during a single command (tokens, AST nodes, argument strings,
+   redirect arrays, the backup fd table) lives in one arena and is thrown
+   away together. See the Memory model section below.
+
+
+If you want the two files that carry the interesting mechanics: `executor.c`
+(how a shell talks to the kernel) and `tokenizer.c` (how a shell reads input
+without a regex library).
+
 ## Roadmap
 
 I plan to add ASAN (address sanitizer) to my arena implementation and build a fuzzer with AFL++ for the shell later on as my goal is to work towards security research.
