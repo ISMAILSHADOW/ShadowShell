@@ -19,7 +19,7 @@ static Token make_error(const char *message) {
     Token token;
     token.type = TOKEN_ERROR;
     token.start = message;
-    token.length = strlen(message);
+    token.length = (uint32_t)strlen(message);
     return token;
 }
 

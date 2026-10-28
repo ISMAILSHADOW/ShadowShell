@@ -10,7 +10,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdbool.h>
-#include <ctype.h>
 #include <sys/stat.h>
 #include <signal.h>
 
@@ -35,7 +34,7 @@ static void backup_fd(int original) {
 }
 
 static void restore_fds() {
-    for (ssize_t i = process_fds->size - 1;i >= 0;i--) {
+    for (ssize_t i = (ssize_t)process_fds->size - 1;i >= 0;i--) {
         int original = process_fds->data[i].fd[0];
         int backup = process_fds->data[i].fd[1];
         if (backup == -1) {
@@ -165,7 +164,9 @@ static inline void take_terminal_control() {
 }
 
 static inline void give_terminal_control(pid_t pid) {
+    signal(SIGTTOU, SIG_IGN);
     tcsetpgrp(STDIN_FILENO, pid);
+    signal(SIGTTOU, SIG_DFL);
 }
 
 static int handle_child_status(pid_t pid, pid_t pgid, int status) {
@@ -179,7 +180,7 @@ static int handle_child_status(pid_t pid, pid_t pgid, int status) {
         ret = 128 + sig;  // Convention for termination by signals
     } else if (WIFSTOPPED(status)) {
         executing = false;
-        printf("\nShadowShell: suspended: " YELLOW "[%d] " RESET "\n", jobs->size);
+        printf("\nShadowShell: suspended: " YELLOW "[%zu] " RESET "\n", jobs->size);
         ProcessArray_push(&jobs_arena, jobs, (Process){.pid=pid, .pgid=pgid, .running=false});
     }
     return ret;
@@ -204,17 +205,17 @@ static int fg(ArgsArray *args) {
         return COMMAND_FAILED;
     }
 
-    int id = jobs->size - 1;
+    int id = (int)jobs->size - 1;
     if (args->size == 2) {
-        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= jobs->size){
+        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= (int)jobs->size){
             fprintf(stderr, "ShadowShell: fg: Invalid Job ID [%d]\n", id);
             return COMMAND_FAILED;
         }
     }
 
     Process proc;
-    ProcessArray_get(jobs, &proc, id);
-    ProcessArray_remove(jobs, id);
+    if (ProcessArray_get(jobs, &proc, (size_t)id) == -1) return COMMAND_FAILED;
+    ProcessArray_remove(jobs, (size_t)id);
 
     give_terminal_control(proc.pgid);
     // Negative is used to wake entire group. I think otherwize pipelines may break.
@@ -231,16 +232,16 @@ static int bg(ArgsArray *args) {
         return COMMAND_FAILED;
     }
 
-    int id = jobs->size - 1;
+    int id = (int)jobs->size - 1;
     if (args->size == 2) {
-        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= jobs->size){
+        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= (int)jobs->size){
             fprintf(stderr, "ShadowShell: bg: Invalid Job ID [%d]\n", id);
             return COMMAND_FAILED;
         }
     }
 
     if (jobs->data[id].running) {
-        printf("bg: job already in background.\n", id);
+        printf("bg: job already in background.\n");
         return 0;
     }
 
@@ -258,9 +259,9 @@ static int jobs_cmd() {
     for (size_t i = 0;i < jobs->size;i++) {
         Process proc = jobs->data[i];
         if (jobs->data[i].running)
-            printf(YELLOW "[%d] is running. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
+            printf(YELLOW "[%zu] is running. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
         else
-            printf(YELLOW "[%d] is suspended. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
+            printf(YELLOW "[%zu] is suspended. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
     }
     return 0;
 }

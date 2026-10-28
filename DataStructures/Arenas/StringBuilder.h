@@ -2,6 +2,7 @@
 #define STRING_BUILDER_H
 
 #include <unistd.h>
+#include <stdbool.h>
 #include "Arena.h"
 
 typedef struct {

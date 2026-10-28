@@ -128,9 +128,10 @@ static const char *child_seperator(ASTNode *n, size_t index) {
         case NODE_LOGICAL_LIST: 
         LogicalArray *arr = n->logical.items;
         if (index < arr->size - 1) return arr->data[index + 1].op == OP_AND_AND ? "&& " : "|| ";
-        case NODE_NEGATION:
+        default:
             break;
     }
+    return NULL;
 }
 
 void ast_to_string(ArenaAllocator *arena, StringBuilder *sb, ASTNode *n) {
@@ -161,6 +162,8 @@ void ast_to_string(ArenaAllocator *arena, StringBuilder *sb, ASTNode *n) {
         sb_append_cstring(arena, sb, "( ");
         ast_to_string(arena, sb, n->unary.child);
         sb_append_cstring(arena, sb, ") ");
+        break;
+        default:
         break;
     }
 }

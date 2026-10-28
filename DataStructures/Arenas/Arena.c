@@ -18,7 +18,7 @@ ArenaAllocator arena_create(size_t size) {
 }
 
 static inline size_t arena_size(ArenaAllocator *arena) {
-    return arena->curr - arena->start;
+    return (size_t) (arena->curr - arena->start);
 }
 
 static inline void *align_pointer(void *ptr) {

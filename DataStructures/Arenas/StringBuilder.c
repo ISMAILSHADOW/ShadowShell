@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <ctype.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdarg.h>
@@ -44,7 +43,7 @@ void sb_append(ArenaAllocator *arena, StringBuilder *s1, StringBuilder *s2) {
     if (align_pointer(s1->buf + s1->capacity + 1) == s2->buf) { // If allocated sequantially in arena merge
         memmove(s1->buf + s1->size, s2->buf, s2->size + 1);
         s1->size = needed;
-        s1->capacity = (s2->buf - s1->buf) + s2->capacity;
+        s1->capacity = (size_t) (s2->buf - s1->buf) + s2->capacity;
         s2->buf = NULL; s2->size = 0; s2->capacity = 0;
         return;
     }
@@ -82,11 +81,11 @@ void sb_appendf(ArenaAllocator *arena, StringBuilder *s, const char *fmt, ...) {
         return;
     }
 
-    size_t needed = s->size + n;
+    size_t needed = s->size + (size_t) n;
     if (needed > s->capacity)
         sb_extend(arena, s, needed * 2);
 
-    vsnprintf(s->buf + s->size, n + 1, fmt, list);
+    vsnprintf(s->buf + s->size,(size_t) n + 1, fmt, list);
     s->size = needed;
     va_end(list);
 }

@@ -1,7 +1,6 @@
 #ifndef DYNAMIC_ARRAY_H
 #define DYNAMIC_ARRAY_H
 
-#include <stdint.h>
 #include <string.h>
 #include "Arena.h"
 

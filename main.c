@@ -8,19 +8,18 @@
 #include <sys/types.h>
 #include "globals.h"
 #include "executor.h"
-#include "DataStructures/Arenas/DynamicArray.h"
 
 static char *line;
 
 static void reap_background_processes() {
-    for (int i = jobs->size - 1;i >= 0;i--) {
+    for (int i = (int)jobs->size - 1;i >= 0;i--) {
         int status;
         pid_t pid = waitpid(jobs->data[i].pid, &status, WNOHANG);
         if (pid == jobs->data[i].pid) {
-            ProcessArray_remove(jobs, i);
+            ProcessArray_remove(jobs, (size_t)i);
             printf(YELLOW "[%d] " RESET "DONE\n", i);
         } else if (pid == -1) {
-            ProcessArray_remove(jobs, i);
+            ProcessArray_remove(jobs, (size_t)i);
         }
     }
 }
