@@ -1,17 +1,30 @@
+/*
+  This executes the AST returned by the parser.
+
+  execute_command() takes a line, runs the parser and calls execute_ast().
+
+  run_subprocess() runs either normal commands, subshells via forking the shell
+  and not calling execve() or background jobs by not waiting for the forked
+  command to complete.
+
+  run_pipeline() creates the pipes first then forks all children in the pipeline
+  connecting their stdin/out to the pipes.
+*/
+
+#include "executor.h"
 #include "ast.h"
 #include "globals.h"
-#include "executor.h"
-#include <unistd.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <string.h>
 #include <fcntl.h>
-#include <stdbool.h>
-#include <sys/stat.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 OpenFDArray *process_fds;
 
@@ -23,9 +36,7 @@ static inline void init_executor() {
     executing = true;
 }
 
-static inline void clean_executor() {
-    executing = false;
-}
+static inline void clean_executor() { executing = false; }
 
 static void backup_fd(int original) {
     int backup = dup(original);
@@ -34,7 +45,7 @@ static void backup_fd(int original) {
 }
 
 static void restore_fds() {
-    for (ssize_t i = (ssize_t)process_fds->size - 1;i >= 0;i--) {
+    for (ssize_t i = (ssize_t)process_fds->size - 1; i >= 0; i--) {
         int original = process_fds->data[i].fd[0];
         int backup = process_fds->data[i].fd[1];
         if (backup == -1) {
@@ -47,10 +58,7 @@ static void restore_fds() {
     process_fds->size = 0;
 }
 
-static bool success(int ret) {
-    return ret == 0;
-}
-
+static bool success(int ret) { return ret == 0; }
 
 static bool redirect_file(char *path, int flags, int fd) {
     int file = open(path, flags, 0666);
@@ -71,8 +79,8 @@ static bool redirect_file(char *path, int flags, int fd) {
 static bool redirect_dup(const char *src, int fd) {
     if (running_builtin) backup_fd(fd);
 
-    if (strcmp(src, "-") == 0) { 
-        close(fd); 
+    if (strcmp(src, "-") == 0) {
+        close(fd);
         return true;
     }
     int from;
@@ -84,19 +92,22 @@ static bool redirect_dup(const char *src, int fd) {
 }
 
 static bool handle_redirects(RedirectArray *reds) {
-    for (size_t i = 0;i < reds->size;i++) {
+    for (size_t i = 0; i < reds->size; i++) {
         int fd1 = reds->data[i].fd;
         char *target = reds->data[i].target;
         bool ok;
-        switch(reds->data[i].op) {
+        switch (reds->data[i].op) {
             case TOKEN_LESS:
-                ok = redirect_file(target,  O_RDONLY, (fd1 == -1) ? STDIN_FILENO : fd1);
+                ok = redirect_file(target, O_RDONLY,
+                                   (fd1 == -1) ? STDIN_FILENO : fd1);
                 break;
             case TOKEN_GREATER:
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC, (fd1 == -1) ? STDOUT_FILENO : fd1);
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC,
+                                   (fd1 == -1) ? STDOUT_FILENO : fd1);
                 break;
             case TOKEN_GREATER_GREATER:
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND, (fd1 == -1) ? STDOUT_FILENO : fd1);
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND,
+                                   (fd1 == -1) ? STDOUT_FILENO : fd1);
                 break;
             case TOKEN_LESS_AND:
                 ok = redirect_dup(target, (fd1 == -1) ? STDIN_FILENO : fd1);
@@ -104,32 +115,35 @@ static bool handle_redirects(RedirectArray *reds) {
             case TOKEN_GREATER_AND:
                 ok = redirect_dup(target, (fd1 == -1) ? STDOUT_FILENO : fd1);
                 break;
-            case TOKEN_AND_GREATER: // Redirect both stdout and stderr (Overwrite)
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC, (fd1 == -1) ? STDOUT_FILENO : fd1);
+            case TOKEN_AND_GREATER: // Redirect both stdout and stderr
+                                    // (Overwrite)
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_TRUNC,
+                                   (fd1 == -1) ? STDOUT_FILENO : fd1);
                 if (ok) {
                     if (running_builtin) backup_fd(STDERR_FILENO);
                     dup2(STDOUT_FILENO, STDERR_FILENO);
                 }
                 break;
-            case TOKEN_AND_GREATER_GREATER: // Redirect both stdout and stderr (Append)
-                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND, (fd1 == -1) ? STDOUT_FILENO : fd1);
+            case TOKEN_AND_GREATER_GREATER: // Redirect both stdout and stderr
+                                            // (Append)
+                ok = redirect_file(target, O_CREAT | O_WRONLY | O_APPEND,
+                                   (fd1 == -1) ? STDOUT_FILENO : fd1);
                 if (ok) {
                     if (running_builtin) backup_fd(STDERR_FILENO);
                     dup2(STDOUT_FILENO, STDERR_FILENO);
                 }
                 break;
             case TOKEN_LESS_GREATER:
-                ok = redirect_file(target, O_CREAT | O_RDWR , (fd1 == -1) ? STDIN_FILENO : fd1);
+                ok = redirect_file(target, O_CREAT | O_RDWR,
+                                   (fd1 == -1) ? STDIN_FILENO : fd1);
                 break;
-            default:
-                ok = false;
+            default: ok = false;
         }
 
         if (!ok) return false;
     }
     return true;
-} 
-
+}
 
 static int cd_builtin(ArgsArray *args) {
     if (args->size > 2) {
@@ -147,15 +161,14 @@ static int cd_builtin(ArgsArray *args) {
     }
 
     if (chdir(args->data[1]) == -1) {
-        fprintf(stderr, "ShadowShell: cd: %s: %s\n", args->data[1], strerror(errno));
+        fprintf(stderr, "ShadowShell: cd: %s: %s\n", args->data[1],
+                strerror(errno));
         return COMMAND_FAILED;
     }
     return COMMAND_SUCCESSFUL;
 }
 
-static void exit_builtin() {
-    exit(0);
-}
+static void exit_builtin() { exit(0); }
 
 static inline void take_terminal_control() {
     signal(SIGTTOU, SIG_IGN);
@@ -176,12 +189,15 @@ static int handle_child_status(pid_t pid, pid_t pgid, int status) {
     } else if (WIFSIGNALED(status)) {
         int sig = WTERMSIG(status);
         if (sig == SIGINT) executing = false;
-        fprintf(stderr, " %s\n", strsignal(sig));  
-        ret = 128 + sig;  // Convention for termination by signals
+        fprintf(stderr, " %s\n", strsignal(sig));
+        ret = 128 + sig; // Convention for termination by signals
     } else if (WIFSTOPPED(status)) {
         executing = false;
-        printf("\nShadowShell: suspended: " YELLOW "[%zu] " RESET "\n", jobs->size);
-        ProcessArray_push(&jobs_arena, jobs, (Process){.pid=pid, .pgid=pgid, .running=false});
+        printf("\nShadowShell: suspended: " YELLOW "[%zu] " RESET "\n",
+               jobs->size);
+        ProcessArray_push(
+            &jobs_arena, jobs,
+            (Process){.pid = pid, .pgid = pgid, .running = false});
     }
     return ret;
 }
@@ -201,13 +217,15 @@ static int wait_for_child(pid_t pid, pid_t pgid) {
 static int fg(ArgsArray *args) {
     if (jobs->size == 0) return 0;
     if (args->size > 2) {
-        fprintf(stderr, "ShadowShell: fg: Expected 0 or 1 arguments (Job ID).\n");
+        fprintf(stderr,
+                "ShadowShell: fg: Expected 0 or 1 arguments (Job ID).\n");
         return COMMAND_FAILED;
     }
 
     int id = (int)jobs->size - 1;
     if (args->size == 2) {
-        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= (int)jobs->size){
+        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) ||
+            id < 0 || id >= (int)jobs->size) {
             fprintf(stderr, "ShadowShell: fg: Invalid Job ID [%d]\n", id);
             return COMMAND_FAILED;
         }
@@ -218,8 +236,9 @@ static int fg(ArgsArray *args) {
     ProcessArray_remove(jobs, (size_t)id);
 
     give_terminal_control(proc.pgid);
-    // Negative is used to wake entire group. I think otherwize pipelines may break.
-    if (!proc.running) kill(-proc.pgid, SIGCONT); 
+    // Negative is used to wake entire group. I think otherwize pipelines may
+    // break.
+    if (!proc.running) kill(-proc.pgid, SIGCONT);
 
     int ret = wait_for_child(proc.pid, proc.pgid);
     return ret;
@@ -228,13 +247,15 @@ static int fg(ArgsArray *args) {
 static int bg(ArgsArray *args) {
     if (jobs->size == 0) return 0;
     if (args->size > 2) {
-        fprintf(stderr, "ShadowShell: bg: Expected 0 or 1 arguments (Job ID).\n");
+        fprintf(stderr,
+                "ShadowShell: bg: Expected 0 or 1 arguments (Job ID).\n");
         return COMMAND_FAILED;
     }
 
     int id = (int)jobs->size - 1;
     if (args->size == 2) {
-        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) || id < 0 || id >= (int)jobs->size){
+        if (!parse_int_const(args->data[1], strlen(args->data[1]), &id) ||
+            id < 0 || id >= (int)jobs->size) {
             fprintf(stderr, "ShadowShell: bg: Invalid Job ID [%d]\n", id);
             return COMMAND_FAILED;
         }
@@ -246,7 +267,7 @@ static int bg(ArgsArray *args) {
     }
 
     kill(-jobs->data[id].pgid, SIGCONT);
-    for (size_t i = 0;i < jobs->size;i++) {
+    for (size_t i = 0; i < jobs->size; i++) {
         if (jobs->data[i].pgid == jobs->data[id].pgid)
             jobs->data[i].running = true;
     }
@@ -256,29 +277,33 @@ static int bg(ArgsArray *args) {
 }
 
 static int jobs_cmd() {
-    for (size_t i = 0;i < jobs->size;i++) {
+    for (size_t i = 0; i < jobs->size; i++) {
         Process proc = jobs->data[i];
         if (jobs->data[i].running)
-            printf(YELLOW "[%zu] is running. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
+            printf(YELLOW "[%zu] is running. PID: %d PGID: %d" RESET "\n", i,
+                   proc.pid, proc.pgid);
         else
-            printf(YELLOW "[%zu] is suspended. PID: %d PGID: %d" RESET "\n", i, proc.pid, proc.pgid);
+            printf(YELLOW "[%zu] is suspended. PID: %d PGID: %d" RESET "\n", i,
+                   proc.pid, proc.pgid);
     }
     return 0;
 }
 
-
 static bool is_builtin(ASTNode *node) {
     if (node->type != NODE_COMMAND || node->cmd.args->size == 0) return false;
     const char *cmd = node->cmd.args->data[0];
-    return strcmp(cmd, "cd") == 0 || strcmp(cmd, "exit") == 0 || strcmp(cmd, "true") == 0 || strcmp(cmd, "false") == 0
-            || strcmp(cmd, "fg") == 0 || strcmp(cmd, "bg") == 0 || strcmp(cmd, "jobs") == 0;
+    return strcmp(cmd, "cd") == 0 || strcmp(cmd, "exit") == 0 ||
+           strcmp(cmd, "true") == 0 || strcmp(cmd, "false") == 0 ||
+           strcmp(cmd, "fg") == 0 || strcmp(cmd, "bg") == 0 ||
+           strcmp(cmd, "jobs") == 0;
 }
 
 static int run_builtin(ASTNode *node) {
     ArgsArray *args = node->cmd.args;
     const char *cmd = args->data[0];
 
-    if (node->cmd.redirect->size != 0 && !handle_redirects(node->cmd.redirect)) {
+    if (node->cmd.redirect->size != 0 &&
+        !handle_redirects(node->cmd.redirect)) {
         fprintf(stderr, "ShadowShell: %s: redirection failed\n", cmd);
         return COMMAND_FAILED;
     }
@@ -295,14 +320,16 @@ static int run_builtin(ASTNode *node) {
 }
 
 static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
-    if (is_builtin(node) && !background)  {
+    if (is_builtin(node) && !background) {
         running_builtin = true;
         int ret = run_builtin(node);
-        restore_fds(); running_builtin = false;
+        restore_fds();
+        running_builtin = false;
         return ret;
     }
 
-    int ret = -1; pid_t pid = -1;
+    int ret = -1;
+    pid_t pid = -1;
     if (!already_forked) {
         pid = fork();
 
@@ -314,25 +341,24 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
         setpgid(pid, job_background ? job_pgid : pid);
         if (!job_background && !background) give_terminal_control(pid);
     }
-    
+
     if (pid == 0 || already_forked) {
         signal(SIGTSTP, SIG_DFL);
         if (node->type == NODE_COMMAND) {
             if (node->cmd.redirect->size != 0)
-                if (!handle_redirects(node->cmd.redirect)) 
-                    _exit(1);
+                if (!handle_redirects(node->cmd.redirect)) _exit(1);
 
-            if (node->cmd.args->size == 0) _exit(0); // For redirect only commands
+            if (node->cmd.args->size == 0)
+                _exit(0); // For redirect only commands
 
             ret = execvp(node->cmd.args->data[0], node->cmd.args->data);
-            fprintf(stderr, "ShadowShell: %s: %s\n", node->cmd.args->data[0], strerror(errno));
-        }
-        else if (node->type == NODE_SUBSHELL) {
+            fprintf(stderr, "ShadowShell: %s: %s\n", node->cmd.args->data[0],
+                    strerror(errno));
+        } else if (node->type == NODE_SUBSHELL) {
             ret = execute_ast(node->unary.child);
-        }
-        else {
+        } else {
             ret = execute_ast(node);
-        } 
+        }
         _exit(ret);
     }
 
@@ -342,18 +368,17 @@ static int run_subprocess(ASTNode *node, bool background, bool already_forked) {
     }
 
     if (background) {
-        ProcessArray_push(&jobs_arena, jobs, (Process){.pid=pid, .pgid=pid, .running=true});
-        printf(YELLOW "[%zu] %d" RESET "\n" , jobs->size - 1, pid);
+        ProcessArray_push(&jobs_arena, jobs,
+                          (Process){.pid = pid, .pgid = pid, .running = true});
+        printf(YELLOW "[%zu] %d" RESET "\n", jobs->size - 1, pid);
         return 0;
     }
 
     return wait_for_child(pid, pid);
 }
 
-
-
 static void close_pipe_array(PipeArray *pipes) {
-    for (size_t i = 0;i < pipes->size;i++) {
+    for (size_t i = 0; i < pipes->size; i++) {
         close(pipes->data[i].fd[0]);
         close(pipes->data[i].fd[1]);
     }
@@ -363,8 +388,8 @@ static int run_pipeline(ASTNode *node) {
     size_t pline_size = node->list.array->size;
     PidArray *pids = PidArray_create(&command_arena, pline_size);
     PipeArray *pipes = PipeArray_create(&command_arena, pline_size - 1);
-    
-    for (size_t i = 1;i < pline_size;i++) {
+
+    for (size_t i = 1; i < pline_size; i++) {
         FDPair p;
         if (pipe(p.fd) == -1) {
             fprintf(stderr, "ShadowShell: pipe: %s\n", strerror(errno));
@@ -375,26 +400,30 @@ static int run_pipeline(ASTNode *node) {
     }
 
     pid_t group_id = -1;
-    for (size_t i = 0;i < pline_size;i++) {
+    for (size_t i = 0; i < pline_size; i++) {
         ASTNode *cur = node->list.array->data[i];
         NodeType type = cur->type;
 
         pid_t pid = fork();
         if (group_id == -1) group_id = job_background ? job_pgid : pid;
-        
+
         setpgid(pid, group_id);
-        if (i == 0 && !job_background) give_terminal_control(group_id); // Call only for first process in the group. It's redundant.
+        if (i == 0 && !job_background)
+            give_terminal_control(group_id); // Call only for first process in
+                                             // the group. It's redundant.
 
         if (pid == 0) {
             signal(SIGTSTP, SIG_DFL);
 
-            if (i > 0)  // We can read from i - 1
-                dup2(pipes->data[i-1].fd[0], STDIN_FILENO);
+            if (i > 0) // We can read from i - 1
+                dup2(pipes->data[i - 1].fd[0], STDIN_FILENO);
             if (i < (pline_size - 1)) // We can write to i
                 dup2(pipes->data[i].fd[1], STDOUT_FILENO);
             close_pipe_array(pipes);
 
-            if (type == NODE_COMMAND || type == NODE_SUBSHELL) // We avoid forking twice in row a pipeline
+            if (type == NODE_COMMAND ||
+                type ==
+                    NODE_SUBSHELL) // We avoid forking twice in row a pipeline
                 _exit(run_subprocess(cur, false, true));
             _exit(execute_ast(cur));
         } else if (pid == -1) {
@@ -408,17 +437,16 @@ static int run_pipeline(ASTNode *node) {
         }
         PidArray_push(&command_arena, pids, pid);
     }
-    
+
     close_pipe_array(pipes);
-    
+
     int status, ret = COMMAND_FAILED;
-    for (size_t i = 0;i < pids->size;i++)  {
+    for (size_t i = 0; i < pids->size; i++) {
         waitpid(pids->data[i], &status, WUNTRACED);
         if (i == 0 && !job_background) take_terminal_control();
         ret = handle_child_status(pids->data[i], pids->data[0], status);
     }
 
-    
     return ret;
 }
 
@@ -428,37 +456,34 @@ static int execute_ast(ASTNode *node) {
     if (node == NULL) return ret;
     switch (node->type) {
         case NODE_COMMAND_LIST:
-            for (size_t i = 0;i < node->list.array->size;i++) {
+            for (size_t i = 0; i < node->list.array->size; i++) {
                 ret = execute_ast(node->list.array->data[i]);
                 if (!executing) return ret;
-            } 
-                
+            }
+
             return ret;
         case NODE_LOGICAL_LIST:
             ret = execute_ast(node->logical.items->data[0].node);
             if (!executing) return ret;
-            for (size_t i = 1;i < node->logical.items->size;i++) {
+            for (size_t i = 1; i < node->logical.items->size; i++) {
                 Operator op = node->logical.items->data[i].op;
-                if ((op == OP_AND_AND && success(ret)) || (op == OP_OR_OR && !success(ret)))
+                if ((op == OP_AND_AND && success(ret)) ||
+                    (op == OP_OR_OR && !success(ret)))
                     ret = execute_ast(node->logical.items->data[i].node);
                 if (!executing) return ret;
             }
             return ret;
-        case NODE_NEGATION:
-            ret = execute_ast(node->unary.child);
-            return !ret;
-        case NODE_PIPELINE:
-            ret = run_pipeline(node);
-            return ret;
+        case NODE_NEGATION: ret = execute_ast(node->unary.child); return !ret;
+        case NODE_PIPELINE: ret = run_pipeline(node); return ret;
         case NODE_BACKGROUND:
             ret = run_subprocess(node->unary.child, true, false);
             return ret;
         case NODE_SUBSHELL:
-        case NODE_COMMAND:
-            ret = run_subprocess(node, false, false);
-            return ret;
-        default: 
-            fprintf(stderr, "Maybe you added a new command without updating the executor?");
+        case NODE_COMMAND: ret = run_subprocess(node, false, false); return ret;
+        default:
+            fprintf(
+                stderr,
+                "Maybe you added a new command without updating the executor?");
             _exit(1);
     }
 }

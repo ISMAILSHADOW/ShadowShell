@@ -5,8 +5,8 @@
 typedef enum : uint8_t {
     // Single character tokens
     // TOKEN_SLASH,
-    TOKEN_LEFT_PAREN, 
-    TOKEN_RIGHT_PAREN, 
+    TOKEN_LEFT_PAREN,
+    TOKEN_RIGHT_PAREN,
     TOKEN_SEMICOLON,
     TOKEN_BANG,
     // One or more
@@ -31,9 +31,8 @@ typedef enum : uint8_t {
     TOKEN_EOF
 } TokenType;
 
-
 typedef struct {
-    const char* start;
+    const char *start;
     uint32_t length;
     TokenType type;
 } Token;

@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-CFLAGS="-O3 -flto -Wall -Wextra -Wconversion -Wsign-conversion -Wpedantic -Werror" 
+CFLAGS="-O3 -std=gnu23 -flto -Wall -Wextra -Wconversion -Wsign-conversion -Wpedantic -Werror" 
 DEBUG=false
 
 TEST_FILES="tests/test.c tests/ast_debug.c"

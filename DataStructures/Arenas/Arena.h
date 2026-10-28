@@ -11,7 +11,8 @@ typedef struct {
 
 ArenaAllocator arena_create(size_t size);
 void *arena_alloc(ArenaAllocator *arena, size_t size);
-void *arena_realloc(ArenaAllocator *arena, void *old, size_t old_size, size_t new_size);
+void *arena_realloc(ArenaAllocator *arena, void *old, size_t old_size,
+                    size_t new_size);
 char *arena_strndup(ArenaAllocator *arena, const char *s, size_t n);
 void arena_reset(ArenaAllocator *arena);
 void arena_free(ArenaAllocator *arena);

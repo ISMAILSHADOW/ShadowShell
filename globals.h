@@ -2,18 +2,18 @@
 #define GLOBALS_H
 
 #include "DataStructures/Arenas/DynamicArray.h"
-#include "tokenizer.h"
 #include "ast.h"
 #include "executor.h"
-#include <stdio.h>
+#include "tokenizer.h"
 #include <stddef.h>
+#include <stdio.h>
 
-#define RED    "\x1b[31m"
-#define GREEN  "\x1b[32m"
+#define RED "\x1b[31m"
+#define GREEN "\x1b[32m"
 #define YELLOW "\x1b[33m"
-#define BLUE   "\x1b[34m"
-#define CYAN   "\x1b[36m"
-#define RESET  "\x1b[0m"
+#define BLUE "\x1b[34m"
+#define CYAN "\x1b[36m"
+#define RESET "\x1b[0m"
 
 #define KB(NUM) ((NUM) * 1024UL)
 #define MB(NUM) ((NUM) * 1024UL * 1024UL)

@@ -1,3 +1,12 @@
+/*
+    The on-demand scanner used by the parser in ast.c
+    init_scanner must be called with a pointer to the line to be tokenized as an
+   argument.
+
+    The line must not be changed while the parser is working as the tokens are
+   generated in place.
+*/
+
 #include "tokenizer.h"
 #include "globals.h"
 #include <string.h>
@@ -23,21 +32,15 @@ static Token make_error(const char *message) {
     return token;
 }
 
-static inline bool is_at_end() {
-    return *scanner.current == '\0';
-}
+static inline bool is_at_end() { return *scanner.current == '\0'; }
 
-static inline char peek() {
-    return *scanner.current;
-}
+static inline char peek() { return *scanner.current; }
 
 static inline char prev() {
-    return scanner.current > scanner.start ? *(scanner.current-1) : '\0';
+    return scanner.current > scanner.start ? *(scanner.current - 1) : '\0';
 }
 
-static inline char advance() {
-    return *scanner.current++;
-}
+static inline char advance() { return *scanner.current++; }
 
 static bool match_next(const char *string) {
     size_t length = strlen(string);
@@ -49,44 +52,44 @@ static bool match_next(const char *string) {
 }
 
 static void skip_whitespace() {
-    while(1) {
+    while (1) {
         char c = peek();
         switch (c) {
             case ' ':
             case '\r':
             case '\t':
-            case '\n':
-                advance();
-                break;
+            case '\n': advance(); break;
             case '#':
-                while(!is_at_end() && advance() != '\n');
+                while (!is_at_end() && peek() != '\n')
+                    advance();
                 break;
-            default:
-                return;
+            default: return;
         }
     }
 }
 
 static Token match_identifier() {
-    bool in_quotes = is_quote(prev()); 
+    bool in_quotes = is_quote(prev());
     char current_quote = is_quote(prev()) ? prev() : '\0';
-    while (!is_at_end() && (in_quotes || (!is_operator(peek()) && !is_space(peek())))) {
+    while (!is_at_end() &&
+           (in_quotes || (!is_operator(peek()) && !is_space(peek())))) {
         if (is_quote(peek())) {
             if (peek() == current_quote) {
                 in_quotes = false;
                 current_quote = '\0';
-            }
-            else if (current_quote == '\0') {
+            } else if (current_quote == '\0') {
                 in_quotes = true;
                 current_quote = peek();
             }
         }
         advance();
     }
-    
-    if (in_quotes) return make_error("\x1b[31mError:\x1b[0m Unterminated string"); 
 
-    if (peek() == '<' || peek() == '>') { // Checks for file descriptors before redirectors.
+    if (in_quotes)
+        return make_error("\x1b[31mError:\x1b[0m Unterminated string");
+
+    if (peek() == '<' ||
+        peek() == '>') { // Checks for file descriptors before redirectors.
         bool all_digits = true;
         for (const char *p = scanner.start; p < scanner.current; p++) {
             if (*p < '0' || *p > '9') {
@@ -111,26 +114,25 @@ Token scan_token() {
     switch (c) {
         case '(': return make_token(TOKEN_LEFT_PAREN);
         case ')': return make_token(TOKEN_RIGHT_PAREN);
-        case '!': return make_token(TOKEN_BANG); // TODO: ! is its own token anywhere, so echo ! is a syntax error.
+        case '!': return make_token(TOKEN_BANG);
         case ';': return make_token(TOKEN_SEMICOLON);
         case '&':
-            if (match_next("&"))  return make_token(TOKEN_AND_AND);
+            if (match_next("&")) return make_token(TOKEN_AND_AND);
             if (match_next(">>")) return make_token(TOKEN_AND_GREATER_GREATER);
-            if (match_next(">"))  return make_token(TOKEN_AND_GREATER);
+            if (match_next(">")) return make_token(TOKEN_AND_GREATER);
             return make_token(TOKEN_AND);
         case '|':
-            if (match_next("|"))  return make_token(TOKEN_OR_OR);
+            if (match_next("|")) return make_token(TOKEN_OR_OR);
             return make_token(TOKEN_OR);
         case '<':
-            if (match_next("<"))  return make_token(TOKEN_LESS_LESS);
-            if (match_next(">"))  return make_token(TOKEN_LESS_GREATER);
-            if (match_next("&"))  return make_token(TOKEN_LESS_AND);
+            if (match_next("<")) return make_token(TOKEN_LESS_LESS);
+            if (match_next(">")) return make_token(TOKEN_LESS_GREATER);
+            if (match_next("&")) return make_token(TOKEN_LESS_AND);
             return make_token(TOKEN_LESS);
         case '>':
-            if (match_next(">"))  return make_token(TOKEN_GREATER_GREATER);
-            if (match_next("&"))  return make_token(TOKEN_GREATER_AND);
+            if (match_next(">")) return make_token(TOKEN_GREATER_GREATER);
+            if (match_next("&")) return make_token(TOKEN_GREATER_AND);
             return make_token(TOKEN_GREATER);
-        default: 
-            return match_identifier();
+        default: return match_identifier();
     }
 }

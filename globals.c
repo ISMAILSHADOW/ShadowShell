@@ -1,20 +1,19 @@
-#include "DataStructures/Arenas/DynamicArray.h"
-#include "DataStructures/Arenas/Arena.h"
 #include "globals.h"
-#include "tokenizer.h"
+#include "DataStructures/Arenas/Arena.h"
+#include "DataStructures/Arenas/DynamicArray.h"
 #include "ast.h"
 #include "executor.h"
+#include "tokenizer.h"
 #include <errno.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 
-
-const char *const COLOR_RED   = "\x1b[31m";
+const char *const COLOR_RED = "\x1b[31m";
 const char *const COLOR_GREEN = "\x1b[32m";
-const char *const COLOR_BLUE  = "\x1b[34m";
-const char *const COLOR_CYAN  = "\x1b[36m";
+const char *const COLOR_BLUE = "\x1b[34m";
+const char *const COLOR_CYAN = "\x1b[36m";
 const char *const COLOR_RESET = "\x1b[0m";
 
 DEFINE_DYNAMIC_ARRAY(char *, ArgsArray)
@@ -47,22 +46,23 @@ void set_prompt_color(int ret) {
 
 // To parse integers from token strings.
 bool parse_int_const(const char *str, size_t len, int *val) {
-    char buf[32]; 
-    if (len >= sizeof(buf)) 
-        return false;
+    char buf[32];
+    if (len >= sizeof(buf)) return false;
 
     memcpy(buf, str, len);
     buf[len] = '\0';
 
-    char *endptr; 
-    errno = 0; // errno must be zeroed as the man page says strtol doesn't reset it on success
+    char *endptr;
+    errno = 0; // errno must be zeroed as the man page says strtol doesn't reset
+               // it on success
     long result = strtol(buf, &endptr, 10);
     *val = (int)result;
 
     if (endptr == buf || *endptr != '\0') return false;
-    
+
     // Check overflow, underflow and int range
-    if (result < INT32_MIN || result > INT32_MAX || errno == ERANGE) return false;
+    if (result < INT32_MIN || result > INT32_MAX || errno == ERANGE)
+        return false;
     return true;
 }
 
@@ -75,6 +75,4 @@ bool is_space(char c) {
     return c == ' ' || c == '\r' || c == '\t' || c == '\n';
 }
 
-bool is_quote(char c) {
-    return c == '\'' || c == '"';
-}
+bool is_quote(char c) { return c == '\'' || c == '"'; }

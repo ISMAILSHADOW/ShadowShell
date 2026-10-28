@@ -22,7 +22,6 @@ typedef enum : uint8_t {
     NODE_NEGATION,
 } NodeType;
 
-
 typedef enum : uint8_t {
     OP_AND_AND,
     OP_OR_OR,
@@ -30,7 +29,6 @@ typedef enum : uint8_t {
     OP_BACKGROUND,
     OP_NEWLINE,
 } Operator;
-
 
 struct Redirect {
     char *target;
@@ -58,7 +56,7 @@ typedef struct {
 typedef struct {
     ArgsArray *args;
     RedirectArray *redirect;
-}  SimpleCommandNode;
+} SimpleCommandNode;
 
 struct ASTNode {
     NodeType type;
@@ -79,7 +77,7 @@ typedef struct {
 ASTNode *run_parser(char *line);
 
 #ifdef DEBUG
-    void print_ast(const ASTNode *root);
+void print_ast(const ASTNode *root);
 #endif
 
 #endif

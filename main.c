@@ -1,18 +1,18 @@
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <signal.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include "globals.h"
 #include "executor.h"
+#include "globals.h"
+#include <errno.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 static char *line;
 
 static void reap_background_processes() {
-    for (int i = (int)jobs->size - 1;i >= 0;i--) {
+    for (int i = (int)jobs->size - 1; i >= 0; i--) {
         int status;
         pid_t pid = waitpid(jobs->data[i].pid, &status, WNOHANG);
         if (pid == jobs->data[i].pid) {
@@ -25,12 +25,13 @@ static void reap_background_processes() {
 }
 
 void sigint_handler(int signum) {
-    (void) signum;
+    (void)signum;
     if (!executing) write(STDOUT_FILENO, "\n" YELLOW "$ " RESET, 12);
 }
 
 static void handle_signals() {
-    struct sigaction sa = {.sa_handler=sigint_handler, .sa_flags=SA_RESTART};
+    struct sigaction sa = {.sa_handler = sigint_handler,
+                           .sa_flags = SA_RESTART};
     sigaction(SIGINT, &sa, NULL);
     signal(SIGTSTP, SIG_IGN);
 }
@@ -47,15 +48,14 @@ static void initialize() {
     handle_signals();
 }
 
-void loop_start() {
-}
+void loop_start() {}
 
 static void loop_end() {
     reap_background_processes();
     arena_reset(&command_arena);
 }
 
-bool exec_from_file(char * filePath) {
+bool exec_from_file(char *filePath) {
     script_file = fopen(filePath, "r");
     if (script_file == NULL) {
         fprintf(stderr, "ShadowShell: %s: %s\n", filePath, strerror(errno));
@@ -66,19 +66,17 @@ bool exec_from_file(char * filePath) {
 }
 
 void clean_exit() {
-    for (size_t i = 0;i < jobs->size;i++) 
+    for (size_t i = 0; i < jobs->size; i++)
         kill(jobs->data[i].pid, SIGHUP);
 }
 
 int main(int argc, char **argv) {
-    if (argc > 2) 
-        return -1;
-    
+    if (argc > 2) return -1;
+
     initialize();
 
     if (argc == 2) {
-        if (!exec_from_file(argv[1])) 
-            return EXIT_FAILURE;
+        if (!exec_from_file(argv[1])) return EXIT_FAILURE;
     }
 
     FILE *input = script_file ? script_file : stdin;
@@ -86,22 +84,24 @@ int main(int argc, char **argv) {
     while (1) {
         // loop_start();
 
-        if (interactive){
+        if (interactive) {
             printf("%s$ %s", prompt_color, COLOR_RESET);
             fflush(stdout);
         }
 
         ssize_t bytes_read = getline(&line, &size, input);
-        if (bytes_read == -1) 
+        if (bytes_read == -1)
             break;
         else if (bytes_read > (ssize_t)MAX_LINE) {
-            fprintf(stderr, "ShadowShell: Command is too long. Maximum command size is %ld", MAX_LINE);
+            fprintf(
+                stderr,
+                "ShadowShell: Command is too long. Maximum command size is %ld",
+                MAX_LINE);
             continue;
         }
 
         int ret = execute_command(line);
-        if (ret != COMMAND_EMPTY)
-            last_status = ret;
+        if (ret != COMMAND_EMPTY) last_status = ret;
         set_prompt_color(ret);
 
         loop_end();
