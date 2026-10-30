@@ -1,6 +1,5 @@
-#ifdef DEBUG
-#include "../DataStructures/Arenas/StringBuilder.h"
-#include "../ast.h"
+#include "StringBuilder.h"
+#include "ast.h"
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -70,14 +69,12 @@ static void print_label(const ASTNode *n) {
 
 static void print_children(const ASTNode *n, const char *prefix);
 
-static void print_tree(const ASTNode *n, const char *prefix, bool is_last,
-                       const char *tag) {
+static void print_tree(const ASTNode *n, const char *prefix, bool is_last, const char *tag) {
     printf("%s%s%s", prefix, is_last ? "└── " : "├── ", tag);
     print_label(n);
 
     char child_prefix[512];
-    snprintf(child_prefix, sizeof child_prefix, "%s%s", prefix,
-             is_last ? "    " : "│   ");
+    snprintf(child_prefix, sizeof child_prefix, "%s%s", prefix, is_last ? "    " : "│   ");
     print_children(n, child_prefix);
 }
 
@@ -102,18 +99,13 @@ void print_ast(const ASTNode *root) {
     print_children(root, "");
 }
 
-static void add_label(ArenaAllocator *arena, StringBuilder *sb,
-                      const ASTNode *n) {
+static void add_label(ArenaAllocator *arena, StringBuilder *sb, const ASTNode *n) {
     switch (n->type) {
-        case NODE_COMMAND_LIST:
-            sb_append_cstring(arena, sb, "COMMAND_LIST ");
-            break;
+        case NODE_COMMAND_LIST: sb_append_cstring(arena, sb, "COMMAND_LIST "); break;
         case NODE_LOGICAL_LIST: sb_append_cstring(arena, sb, "LOGICAL "); break;
         case NODE_PIPELINE: sb_append_cstring(arena, sb, "PIPELINE "); break;
         case NODE_NEGATION: sb_append_cstring(arena, sb, "NOT "); break;
-        case NODE_BACKGROUND:
-            sb_append_cstring(arena, sb, "BACKGROUND ");
-            break;
+        case NODE_BACKGROUND: sb_append_cstring(arena, sb, "BACKGROUND "); break;
         case NODE_SUBSHELL: sb_append_cstring(arena, sb, "SUBSHELL "); break;
         case NODE_COMMAND:
             sb_append_cstring(arena, sb, "COMMAND ");
@@ -126,8 +118,7 @@ static void add_label(ArenaAllocator *arena, StringBuilder *sb,
                     Redirect *r = &n->cmd.redirect->data[i];
                     sb_append_cstring(arena, sb, " [");
                     if (r->fd != -1) sb_appendf(arena, sb, "%d", r->fd);
-                    sb_appendf(arena, sb, "%s %s]", redirect_str(r->op),
-                               r->target);
+                    sb_appendf(arena, sb, "%s %s]", redirect_str(r->op), r->target);
                 }
                 sb_append_cstring(arena, sb, " ) ");
             }
@@ -141,8 +132,7 @@ static const char *child_seperator(ASTNode *n, size_t index) {
         case NODE_COMMAND_LIST: return "; ";
         case NODE_LOGICAL_LIST:
             LogicalArray *arr = n->logical.items;
-            if (index < arr->size - 1)
-                return arr->data[index + 1].op == OP_AND_AND ? "&& " : "|| ";
+            if (index < arr->size - 1) return arr->data[index + 1].op == OP_AND_AND ? "&& " : "|| ";
         default: break;
     }
     return NULL;
@@ -157,8 +147,7 @@ void ast_to_string(ArenaAllocator *arena, StringBuilder *sb, ASTNode *n) {
             sb_append_cstring(arena, sb, "( ");
             for (size_t i = 0; i < arr->size; i++) {
                 ast_to_string(arena, sb, arr->data[i]);
-                if (i < arr->size - 1)
-                    sb_append_cstring(arena, sb, child_seperator(n, i));
+                if (i < arr->size - 1) sb_append_cstring(arena, sb, child_seperator(n, i));
             }
             sb_append_cstring(arena, sb, ") ");
             break;
@@ -167,8 +156,7 @@ void ast_to_string(ArenaAllocator *arena, StringBuilder *sb, ASTNode *n) {
             sb_append_cstring(arena, sb, "( ");
             for (size_t i = 0; i < list->size; i++) {
                 ast_to_string(arena, sb, list->data[i].node);
-                if (i < list->size - 1)
-                    sb_append_cstring(arena, sb, child_seperator(n, i));
+                if (i < list->size - 1) sb_append_cstring(arena, sb, child_seperator(n, i));
             }
             sb_append_cstring(arena, sb, ") ");
             break;
@@ -182,4 +170,3 @@ void ast_to_string(ArenaAllocator *arena, StringBuilder *sb, ASTNode *n) {
         default: break;
     }
 }
-#endif

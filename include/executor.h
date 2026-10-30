@@ -1,7 +1,8 @@
 #ifndef EXECUTOR_H
 #define EXECUTOR_H
-#include "DataStructures/Arenas/DynamicArray.h"
+#include "DynamicArray.h"
 #include <stdbool.h>
+#include <sys/types.h>
 
 typedef struct {
     int fd[2];

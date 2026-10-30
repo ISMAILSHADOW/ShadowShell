@@ -1,6 +1,6 @@
 #ifndef AST_H
 #define AST_H
-#include "DataStructures/Arenas/DynamicArray.h"
+#include "DynamicArray.h"
 #include "tokenizer.h"
 
 typedef struct ASTNode ASTNode;
@@ -75,9 +75,5 @@ typedef struct {
 } Parser;
 
 ASTNode *run_parser(char *line);
-
-#ifdef DEBUG
-void print_ast(const ASTNode *root);
-#endif
 
 #endif

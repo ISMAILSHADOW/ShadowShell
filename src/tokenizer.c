@@ -71,8 +71,7 @@ static void skip_whitespace() {
 static Token match_identifier() {
     bool in_quotes = is_quote(prev());
     char current_quote = is_quote(prev()) ? prev() : '\0';
-    while (!is_at_end() &&
-           (in_quotes || (!is_operator(peek()) && !is_space(peek())))) {
+    while (!is_at_end() && (in_quotes || (!is_operator(peek()) && !is_space(peek())))) {
         if (is_quote(peek())) {
             if (peek() == current_quote) {
                 in_quotes = false;
@@ -85,11 +84,9 @@ static Token match_identifier() {
         advance();
     }
 
-    if (in_quotes)
-        return make_error("\x1b[31mError:\x1b[0m Unterminated string");
+    if (in_quotes) return make_error("\x1b[31mError:\x1b[0m Unterminated string");
 
-    if (peek() == '<' ||
-        peek() == '>') { // Checks for file descriptors before redirectors.
+    if (peek() == '<' || peek() == '>') { // Checks for file descriptors before redirectors.
         bool all_digits = true;
         for (const char *p = scanner.start; p < scanner.current; p++) {
             if (*p < '0' || *p > '9') {

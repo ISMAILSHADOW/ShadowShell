@@ -1,6 +1,6 @@
-#include "../DataStructures/Arenas/StringBuilder.h"
-#include "../globals.h"
+#include "StringBuilder.h"
 #include "ast_debug.h"
+#include "globals.h"
 #include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
@@ -10,25 +10,24 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define CHECK(c)                                                               \
-    do {                                                                       \
-        if (!(c)) {                                                            \
-            fprintf(stderr, "  %s:%d: CHECK failed: %s\n", __FILE__, __LINE__, \
-                    #c);                                                       \
-            _exit(1);                                                          \
-        }                                                                      \
+#define CHECK(c)                                                                                   \
+    do {                                                                                           \
+        if (!(c)) {                                                                                \
+            fprintf(stderr, "  %s:%d: CHECK failed: %s\n", __FILE__, __LINE__, #c);                \
+            _exit(1);                                                                              \
+        }                                                                                          \
     } while (0)
 
-#define CHECK_STR(got, want)                                                   \
-    do {                                                                       \
-        if (strcmp((got), (want)) != 0) {                                      \
-            fprintf(stderr, "  %s:%d: expected \"%s\" but got \"%s\"\n",       \
-                    __FILE__, __LINE__, (want), (got));                        \
-            _exit(1);                                                          \
-        }                                                                      \
+#define CHECK_STR(got, want)                                                                       \
+    do {                                                                                           \
+        if (strcmp((got), (want)) != 0) {                                                          \
+            fprintf(stderr, "  %s:%d: expected \"%s\" but got \"%s\"\n", __FILE__, __LINE__,       \
+                    (want), (got));                                                                \
+            _exit(1);                                                                              \
+        }                                                                                          \
     } while (0)
 
-// #include "../tokenizer.h"
+// #include "tokenizer.h"
 // static void test_tokenizer_manually(char *line) {
 //     while (1) {
 //         printf("$ ");
@@ -75,8 +74,7 @@ typedef struct {
 static bool run_test(TestCase *t) {
     pid_t pid = fork();
     if (pid == 0) {
-        int fd =
-            open("./test.log", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
+        int fd = open("./test.log", O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0666);
         dup2(fd, STDOUT_FILENO);
         dup2(fd, STDERR_FILENO);
         alarm(t->timeout);
@@ -91,11 +89,10 @@ static bool run_test(TestCase *t) {
         return true;
     } else if (WIFSIGNALED(wstatus)) {
         if (WTERMSIG(wstatus) == SIGALRM)
-            printf(RED "[FAIL] %s: Process Timed Out After %d Seconds\n" RESET,
-                   t->name, t->timeout);
+            printf(RED "[FAIL] %s: Process Timed Out After %d Seconds\n" RESET, t->name,
+                   t->timeout);
         else
-            printf(RED "[FAIL] Signaled %s: %s\n" RESET, t->name,
-                   strsignal(WTERMSIG(wstatus)));
+            printf(RED "[FAIL] Signaled %s: %s\n" RESET, t->name, strsignal(WTERMSIG(wstatus)));
     } else
         printf(RED "[FAIL] %s\n" RESET, t->name);
 
@@ -109,11 +106,10 @@ void ParserTest1() {
     StringBuilder sb = sb_create(&command_arena, 16);
     ast_to_string(&command_arena, &sb, node);
 
-    StringBuilder expected = sb_create_cstring(
-        &command_arena,
-        "LOGICAL ( NOT ( PIPELINE ( COMMAND ( \"a\" ) |"
-        "COMMAND ( \"b\" ) ) ) && COMMAND ( \"c\" ) || COMMAND ( "
-        "\"sleep\" \"1\" ) )");
+    StringBuilder expected =
+        sb_create_cstring(&command_arena, "LOGICAL ( NOT ( PIPELINE ( COMMAND ( \"a\" ) |"
+                                          "COMMAND ( \"b\" ) ) ) && COMMAND ( \"c\" ) || COMMAND ( "
+                                          "\"sleep\" \"1\" ) )");
     CHECK(sb_cmp_ign(&sb, &expected, " "));
     _exit(0);
 }
@@ -130,10 +126,10 @@ void ParserTest3() {
     ASTNode *node = run_parser("ls -l | grep txt | wc -l");
 
     StringBuilder sb = sb_create(&command_arena, 16);
-    StringBuilder expected = sb_create_cstring(
-        &command_arena, "PIPELINE ( COMMAND ( \"ls\" \"-l\" ) | "
-                        "COMMAND ( \"grep\" \"txt\" ) | "
-                        "COMMAND ( \"wc\" \"-l\" ) )");
+    StringBuilder expected =
+        sb_create_cstring(&command_arena, "PIPELINE ( COMMAND ( \"ls\" \"-l\" ) | "
+                                          "COMMAND ( \"grep\" \"txt\" ) | "
+                                          "COMMAND ( \"wc\" \"-l\" ) )");
 
     ast_to_string(&command_arena, &sb, node);
     CHECK(sb_cmp_ign(&sb, &expected, " "));
@@ -145,10 +141,10 @@ void ParserTest4() {
     ASTNode *node = run_parser("(cd /tmp && ls) | grep foo");
 
     StringBuilder sb = sb_create(&command_arena, 16);
-    StringBuilder expected = sb_create_cstring(
-        &command_arena, "PIPELINE ( SUBSHELL ( LOGICAL ( COMMAND ( \"cd\" "
-                        "\"/tmp\" ) && COMMAND ( \"ls\" ) ) ) | "
-                        "COMMAND ( \"grep\" \"foo\" ) )");
+    StringBuilder expected =
+        sb_create_cstring(&command_arena, "PIPELINE ( SUBSHELL ( LOGICAL ( COMMAND ( \"cd\" "
+                                          "\"/tmp\" ) && COMMAND ( \"ls\" ) ) ) | "
+                                          "COMMAND ( \"grep\" \"foo\" ) )");
 
     ast_to_string(&command_arena, &sb, node);
     CHECK(sb_cmp_ign(&sb, &expected, " "));
@@ -160,8 +156,8 @@ void ParserTest5() {
     ASTNode *node = run_parser("cat < input.txt > output.txt");
 
     StringBuilder sb = sb_create(&command_arena, 16);
-    StringBuilder expected = sb_create_cstring(
-        &command_arena, "COMMAND ( \"cat\" [< input.txt] [> output.txt] )");
+    StringBuilder expected =
+        sb_create_cstring(&command_arena, "COMMAND ( \"cat\" [< input.txt] [> output.txt] )");
 
     ast_to_string(&command_arena, &sb, node);
     CHECK(sb_cmp_ign(&sb, &expected, " "));
@@ -173,10 +169,9 @@ void ParserTest6() {
     ASTNode *node = run_parser("sleep 1 & echo done");
 
     StringBuilder sb = sb_create(&command_arena, 16);
-    StringBuilder expected = sb_create_cstring(
-        &command_arena,
-        "COMMAND_LIST ( BACKGROUND ( COMMAND ( \"sleep\" \"1\" ) "
-        ") ; COMMAND ( \"echo\" \"done\" ) )");
+    StringBuilder expected =
+        sb_create_cstring(&command_arena, "COMMAND_LIST ( BACKGROUND ( COMMAND ( \"sleep\" \"1\" ) "
+                                          ") ; COMMAND ( \"echo\" \"done\" ) )");
 
     ast_to_string(&command_arena, &sb, node);
     CHECK(sb_cmp_ign(&sb, &expected, " "));
@@ -318,46 +313,14 @@ TestCase tests[NUM_TESTS] = {
     {.name = "Parser 5: (Redirections)", .timeout = 2, .fn = ParserTest5},
     {.name = "Parser 6: (Background List)", .timeout = 2, .fn = ParserTest6},
     {.name = "Parser 7: (Hanging Pipe Error)", .timeout = 2, .fn = ParserTest7},
-    {
-        .name = "SB 1: empty builder is terminated",
-        .timeout = 2,
-        .fn = SBTest1,
-    },
-    {
-        .name = "SB 2: append grows",
-        .timeout = 2,
-        .fn = SBTest2,
-    },
-    {
-        .name = "SB 3: appendf formats and grows",
-        .timeout = 2,
-        .fn = SBTest3,
-    },
-    {
-        .name = "SB 4: append builder, separate buffers",
-        .timeout = 2,
-        .fn = SBTest4,
-    },
-    {
-        .name = "SB 5: append builder, adjacent buffers",
-        .timeout = 2,
-        .fn = SBTest5,
-    },
-    {
-        .name = "SB 6: strip",
-        .timeout = 2,
-        .fn = SBTest6,
-    },
-    {
-        .name = "SB 7: compare ignoring characters",
-        .timeout = 2,
-        .fn = SBTest7,
-    },
-    {
-        .name = "SB 8: NULL input",
-        .timeout = 2,
-        .fn = SBTest8,
-    },
+    {.name = "SB 1: empty builder is terminated", .timeout = 2, .fn = SBTest1},
+    {.name = "SB 2: append grows", .timeout = 2, .fn = SBTest2},
+    {.name = "SB 3: appendf formats and grows", .timeout = 2, .fn = SBTest3},
+    {.name = "SB 4: append builder, separate buffers", .timeout = 2, .fn = SBTest4},
+    {.name = "SB 5: append builder, adjacent buffers", .timeout = 2, .fn = SBTest5},
+    {.name = "SB 6: strip", .timeout = 2, .fn = SBTest6},
+    {.name = "SB 7: compare ignoring characters", .timeout = 2, .fn = SBTest7},
+    {.name = "SB 8: NULL input", .timeout = 2, .fn = SBTest8},
 };
 
 int main(void) {
@@ -365,7 +328,6 @@ int main(void) {
     for (int i = 0; i < NUM_TESTS; i++) {
         if (!run_test(&tests[i])) failures++;
     }
-    printf("Tests: %d passed, %d failed, %d total\n", NUM_TESTS - failures,
-           failures, NUM_TESTS);
+    printf("Tests: %d passed, %d failed, %d total\n", NUM_TESTS - failures, failures, NUM_TESTS);
     return failures ? 1 : 0;
 }

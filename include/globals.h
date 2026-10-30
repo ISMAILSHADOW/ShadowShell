@@ -1,7 +1,6 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 
-#include "DataStructures/Arenas/DynamicArray.h"
 #include "ast.h"
 #include "executor.h"
 #include "tokenizer.h"

@@ -1,6 +1,6 @@
 #include "globals.h"
-#include "DataStructures/Arenas/Arena.h"
-#include "DataStructures/Arenas/DynamicArray.h"
+#include "Arena.h"
+#include "DynamicArray.h"
 #include "ast.h"
 #include "executor.h"
 #include "tokenizer.h"
@@ -61,18 +61,15 @@ bool parse_int_const(const char *str, size_t len, int *val) {
     if (endptr == buf || *endptr != '\0') return false;
 
     // Check overflow, underflow and int range
-    if (result < INT32_MIN || result > INT32_MAX || errno == ERANGE)
-        return false;
+    if (result < INT32_MIN || result > INT32_MAX || errno == ERANGE) return false;
     return true;
 }
 
 bool is_operator(char c) {
-    return c == '|' || c == '&' || c == '<' || c == '>' || c == ';' ||
-           c == '(' || c == ')' || c == '\0';
+    return c == '|' || c == '&' || c == '<' || c == '>' || c == ';' || c == '(' || c == ')' ||
+           c == '\0';
 }
 
-bool is_space(char c) {
-    return c == ' ' || c == '\r' || c == '\t' || c == '\n';
-}
+bool is_space(char c) { return c == ' ' || c == '\r' || c == '\t' || c == '\n'; }
 
 bool is_quote(char c) { return c == '\'' || c == '"'; }

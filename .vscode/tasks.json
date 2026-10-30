@@ -2,67 +2,20 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Build Test via Script",
             "type": "shell",
-            "label": "Compile All C Test Files and Debug", 
-            "command": "gcc",
+            "command": "${workspaceFolder}/build.sh",
             "args": [
-                "-g",
-                "${workspaceFolder}/test.c", 
-                "${workspaceFolder}/globals.c", 
-                "${workspaceFolder}/tokenizer.c", 
-                "${workspaceFolder}/ast.c", 
-                "${workspaceFolder}/ast_debug.c", 
-                "${workspaceFolder}/DataStructures/Arenas/Arena.c",
-                "${workspaceFolder}/DataStructures/Arenas/StringBuilder.c",
-                "-DDEBUG",
-                "-o",
-                "${workspaceFolder}/ShadowShell"
+                "test"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+            "group": "build"
         },
-         {
+        {
+            "label": "Build Debug via Script",
             "type": "shell",
-            "label": "Compile All C Files and Debug", 
-            "command": "gcc",
+            "command": "${workspaceFolder}/build.sh",
             "args": [
-                "-g",
-                "${workspaceFolder}/main.c", 
-                "${workspaceFolder}/globals.c", 
-                "${workspaceFolder}/tokenizer.c", 
-                "${workspaceFolder}/ast.c", 
-                "${workspaceFolder}/executor.c", 
-                "${workspaceFolder}/DataStructures/Arenas/Arena.c",
-                "${workspaceFolder}/DataStructures/Arenas/StringBuilder.c",
-                "-DDEBUG",
-                "-o",
-                "${workspaceFolder}/ShadowShell"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        },
-         {
-            "type": "shell",
-            "label": "Compile All C Files For Profiling", 
-            "command": "gcc",
-            "args": [
-                "-g",
-                "-pg",
-                "-O0",
-                "${workspaceFolder}/main.c", 
-                "${workspaceFolder}/globals.c", 
-                "${workspaceFolder}/tokenizer.c", 
-                "${workspaceFolder}/ast.c", 
-                "${workspaceFolder}/executor.c", 
-                "${workspaceFolder}/DataStructures/Arenas/Arena.c",
-                "${workspaceFolder}/DataStructures/Arenas/StringBuilder.c",
-                "-DDEBUG",
-                "-o",
-                "${workspaceFolder}/ShadowShell"
+                "-d"
             ],
             "group": {
                 "kind": "build",

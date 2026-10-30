@@ -1,9 +1,10 @@
 #!/usr/bin/bash
-CFLAGS="-O3 -std=gnu23 -flto -Wall -Wextra -Wconversion -Wsign-conversion -Wpedantic -Werror" 
+CFLAGS="-O3 -I./include -std=gnu23 -flto -Wall -Wextra -Wconversion -Wsign-conversion -Wpedantic -Werror" 
 DEBUG=false
 
-TEST_FILES="tests/test.c tests/ast_debug.c"
-MAIN_FILES="ast.c executor.c globals.c tokenizer.c DataStructures/Arenas/Arena.c DataStructures/Arenas/StringBuilder.c"
+TEST_FILES=$(find tests -type f -name "*.c" 2>/dev/null)
+
+MAIN_FILES=$(find src -type f -name "*.c" | grep -v "^src/main\.c$")
 
 for arg in "$@"; do
     if [[ "$arg" == "-d" || "$arg" == "-debug" ]]; then
@@ -23,7 +24,7 @@ if [[ "$DEBUG" == true ]] || [[ "$TYPE" == "test" ]]; then
 fi
 
 if [[ "$TYPE" == "release" ]] || [[ -z "$TYPE" ]]; then
-    gcc main.c $MAIN_FILES $CFLAGS -o ShadowShell
+    gcc src/main.c $MAIN_FILES $CFLAGS -o ShadowShell
 elif [[ "$TYPE" == "test" ]]; then
     gcc $TEST_FILES $MAIN_FILES $CFLAGS -o ShadowShell
 fi
